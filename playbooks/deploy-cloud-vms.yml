@@ -1,0 +1,45 @@
+---
+
+- name: Deploy Cloud VMs using Terraform
+  hosts: localhost
+  gather_facts: false
+  vars:
+    output_dir: "{{ playbook_dir }}/terraform"  # Adjust this path as needed
+  vars_files:
+    - vars/cloud.yml
+  tasks:
+    - name: Ensure output directory exists
+      ansible.builtin.file:
+        path: "{{ output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Generate Terraform configuration from template
+      ansible.builtin.template:
+        src: "templates/main.tf.j2"
+        dest: "{{ output_dir }}/main.tf"
+        mode: "0644"
+        owner: "lboubeta"
+
+    - name: Generate variables file
+      ansible.builtin.template:
+        src: "templates/variables.tf.j2"
+        dest: "{{ output_dir }}/variables.tf"
+        mode: "0644"
+        owner: "lboubeta"
+
+    - name: Run terraform init
+      ansible.builtin.command: terraform init
+      args:
+        chdir: "{{ output_dir }}"
+      register: terraform_init
+
+    - name: Run terraform apply
+      ansible.builtin.command: terraform apply -auto-approve
+      args:
+        chdir: "{{ output_dir }}"
+      register: terraform_apply
+
+    - name: Display Terraform apply output
+      ansible.builtin.debug:
+        var: terraform_apply.stdout_lines

@@ -1,0 +1,46 @@
+aap_hostname: https://summit25-aap.apps.cluster-bktlg.dynamic.redhatworkshops.io
+aap_validate_certs: false
+aap_username: admin
+aap_password: "admin123!"
+users_default_password: "admin123!"
+
+
+aap_organizations:
+  - name: Default
+    description: This is the Default Organization
+  - name: Logista
+    description: This is the Logista Organization
+    max_hosts: 10
+    galaxy_credentials:
+      - "Ansible Galaxy"
+      - "Red Hat Published"
+      - "Red Hat Verified"
+
+automation_hub_list:
+  - name: published
+    url: https://console.redhat.com/api/automation-hub/content/published/
+    auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+    token: "{{ rh_certified_token }}"
+  - name: verified
+    url: https://console.redhat.com/api/automation-hub/content/verified/
+    auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+    token: "{{ rh_certified_token }}"
+
+aap_user_accounts:
+  - username: "infra"
+    password: "{{ users_default_password }}"
+    first_name: "Infra"
+    last_name: "User"
+    email: "infra@example.com"
+    organization: "Logista"
+
+aap_teams:
+  - name: "Admins"
+    description: "Admin Users Team"
+    organization: "Default"
+  - name: "Operators"
+    description: "Operator Users Team"
+    organization: "Logista"
+  - name: "Developers"
+    description: "Developer Users Team"
+    organization: "Logista"

@@ -1,0 +1,61 @@
+# Variables used by playbooks/templates/main.tf.j2 and the terraform role.
+# Put secret values into Ansible Vault or your CI secret store.
+
+cloud: "aws"                     # "aws" | "gcp" | "azure"
+name_prefix: "test"           # used for resource names
+region: "eu-north-1"              # AWS/Azure region or GCP region base
+zone: ""                         # optional GCP/AZ zone (e.g. "us-east1-b")
+project: ""                      # GCP project id (optional)
+create_public_ip: true            # whether to create public IPs for VMs
+
+
+# Networking
+cidr_block: "10.0.0.0/16"
+subnet_cidr: "10.0.1.0/24"
+aws_az_prefix: ""                # optional AZ override used in template (leave empty to omit)
+dns_domain: "example.com"          # domain for DNS records (leave empty to omit)
+
+
+# VM specifics
+vm_count: 1
+instance_type: "t3.micro"        # AWS / GCP / Azure sizes as appropriate
+# image: used for AWS (AMI id) and GCP (image family or project/image); Azure uses azure_image map
+image: "ami-0c4b8477135926c4f"                        # e.g. "ami-0123456789abcdef0" or "debian-cloud/debian-11"
+
+# # Azure image reference (used by azurerm source_image_reference)
+# azure_image:
+#   publisher: "Canonical"
+#   offer:     "UbuntuServer"
+#   sku:       "18.04-LTS"
+#   version:   "latest"
+
+# SSH / user
+ssh_public_key: "{{ lookup('file', 'files/id_rsa.pub') }}"               # prefer: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}" stored via vault if needed
+ssh_user: "lboubeta"                     # username to create/use on VMs (template defaults apply if empty)
+
+# Tags / labels
+tags: {}                         # map/dict of tags/labels to attach to resources
+
+# Cloud provider credentials (keep empty and set via Vault/CI)
+# AWS
+
+
+# # GCP
+# gcp_service_account_file: ""     # path to service account JSON on control node
+# # Azure (ARM variables for Terraform azurerm provider)
+# azure_client_id: ""
+# azure_client_secret: ""
+# azure_subscription_id: ""
+# azure_tenant_id: ""
+
+# # Local/output settings for the terraform generation
+# output_dir: "{{ playbook_dir | default('.') }}/build/{{ name_prefix }}"
+# terraform_vars_file: ""          # optional path to a generated terraform.tfvars.json or similar
+
+# Terraform backend (S3 + optional DynamoDB locking)
+backend_s3_bucket: "my-terraform-state-bucket"            # required: S3 bucket name
+backend_s3_key: "test/terraform.tfstate"            # path/key inside bucket
+backend_region: "eu-north-1"                          # region of the bucket (defaults to aws_region if omitted)
+backend_encrypt: true                                  # enable SSE
+backend_dynamodb_table: "test-tf-locks"               # optional: DynamoDB table name for locks (create separately or set create_backend_resources)
+create_backend_resources: false                          # set true only for a bootstrap run

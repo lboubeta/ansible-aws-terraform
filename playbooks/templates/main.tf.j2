@@ -1,0 +1,420 @@
+{# Jinja template to render a Terraform main.tf for AWS, GCP (google) or Azure (azurerm).
+   Template renders Terraform that expects the variables defined in variables.tf.
+#}
+
+{%- if cloud == "aws" %}
+
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  {%- if backend_s3_bucket %}
+  backend "s3" {
+    bucket         = "{{ backend_s3_bucket }}"
+    key            = "{{ backend_s3_key | default(name_prefix ~ '/terraform.tfstate') }}"
+    region         = "{{ backend_region | default(aws_region) }}"
+    encrypt        = {{ backend_encrypt | default(true) | tojson }}
+    {%- if backend_dynamodb_table %}
+    dynamodb_table = "{{ backend_dynamodb_table }}"
+    {%- endif %}
+  }
+  {%- endif %}
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+{# Optional creation of backend resources (bucket / locking table). Note: if you enable backend in terraform{} block,
+   terraform init will try to use that backend — the backend bucket/table must exist prior to init or you must
+   bootstrap them separately. Use create_backend_resources = true only in a bootstrapping run or create bucket/table externally. #}
+{%- if create_backend_resources and backend_s3_bucket %}
+resource "aws_s3_bucket" "{{ name_prefix }}_tfstate_bucket" {
+  bucket = "{{ backend_s3_bucket }}"
+  acl    = "private"
+
+  tags = merge({ Name = format("%s-tfstate", var.name_prefix) }, var.tags)
+}
+
+resource "aws_s3_bucket_versioning" "{{ name_prefix }}_tfstate_versioning" {
+  bucket = aws_s3_bucket.{{ name_prefix }}_tfstate_bucket.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "{{ name_prefix }}_tfstate_sse" {
+  bucket = aws_s3_bucket.{{ name_prefix }}_tfstate_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+{%- if backend_dynamodb_table %}
+resource "aws_dynamodb_table" "{{ name_prefix }}_tf_locks" {
+  name         = "{{ backend_dynamodb_table }}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
+
+  attribute {
+    name = "LockID"
+    type = "S"
+  }
+
+  tags = merge({ Name = format("%s-tf-locks", var.name_prefix) }, var.tags)
+}
+{%- endif %}
+{%- endif %}
+
+# --- VPC ---
+resource "aws_vpc" "{{ name_prefix }}_vpc" {
+  cidr_block = var.cidr_block
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = merge({ Name = "${var.name_prefix}-vpc" }, var.tags)
+}
+
+# --- Subnet (public by default) ---
+resource "aws_subnet" "{{ name_prefix }}_public_subnet" {
+  vpc_id                  = aws_vpc.{{ name_prefix }}_vpc.id
+  cidr_block              = var.subnet_cidr
+  map_public_ip_on_launch = var.map_public_ip_on_launch
+  availability_zone       = "${var.aws_region}${var.aws_az_suffix}"
+
+  tags = merge({ Name = "${var.name_prefix}-public-subnet" }, var.tags)
+}
+
+# --- Internet Gateway & Public Route Table ---
+resource "aws_internet_gateway" "{{ name_prefix }}_igw" {
+  vpc_id = aws_vpc.{{ name_prefix }}_vpc.id
+  tags   = merge({ Name = "${var.name_prefix}-igw" }, var.tags)
+}
+
+resource "aws_route_table" "{{ name_prefix }}_public_rt" {
+  vpc_id = aws_vpc.{{ name_prefix }}_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.{{ name_prefix }}_igw.id
+  }
+
+  tags = merge({ Name = "${var.name_prefix}-public-rt" }, var.tags)
+}
+
+resource "aws_route_table_association" "{{ name_prefix }}_public_assoc" {
+  subnet_id      = aws_subnet.{{ name_prefix }}_public_subnet.id
+  route_table_id = aws_route_table.{{ name_prefix }}_public_rt.id
+}
+
+# --- Security Group ---
+resource "aws_security_group" "{{ name_prefix }}_sg" {
+  name        = "${var.name_prefix}-sg"
+  description = "Allow SSH and application ports"
+  vpc_id      = aws_vpc.{{ name_prefix }}_vpc.id
+
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  dynamic "ingress" {
+    for_each = var.extra_ingress_rules
+    content {
+      description = ingress.value.description
+      from_port   = ingress.value.from_port
+      to_port     = ingress.value.to_port
+      protocol    = ingress.value.protocol
+      cidr_blocks = ingress.value.cidr_blocks
+    }
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge({ Name = "${var.name_prefix}-sg" }, var.tags)
+}
+
+# --- Key pair (public key from path) ---
+resource "aws_key_pair" "{{ name_prefix }}_key" {
+  key_name   = var.key_name
+  public_key = file(var.public_key_path)
+}
+
+# --- AMI lookup (RHEL9 default) ---
+data "aws_ami" "{{ name_prefix }}_rhel9" {
+  most_recent = true
+  owners      = [var.rhel9_owner]
+
+  filter {
+    name   = "name"
+    values = ["RHEL-9.*x86_64*"]
+  }
+}
+
+# --- EC2 instances ---
+resource "aws_instance" "{{ name_prefix }}_vm" {
+  count                      = var.vm_count
+  ami                        = coalesce(var.ami_id, data.aws_ami.{{ name_prefix }}_rhel9.id)
+  instance_type              = var.instance_type
+  subnet_id                  = aws_subnet.{{ name_prefix }}_public_subnet.id
+  vpc_security_group_ids     = [aws_security_group.{{ name_prefix }}_sg.id]
+  associate_public_ip_address = false
+  key_name                   = aws_key_pair.{{ name_prefix }}_key.key_name
+
+  tags = merge({ Name = format("%s-vm-%02d", var.name_prefix, count.index) }, var.tags)
+
+  user_data = var.user_data
+}
+
+# --- Optional Elastic IPs and association ---
+resource "aws_eip" "{{ name_prefix }}_eip" {
+  count = var.create_public_ip ? var.vm_count : 0
+  vpc   = true
+
+  depends_on = [ aws_instance.{{ name_prefix }}_vm ]
+  tags = merge({ Name = format("%s-eip-%02d", var.name_prefix, count.index) }, var.tags)
+}
+
+resource "aws_eip_association" "{{ name_prefix }}_eip_assoc" {
+  count = var.create_public_ip ? var.vm_count : 0
+
+  instance_id   = aws_instance.{{ name_prefix }}_vm[count.index].id
+  allocation_id = aws_eip.{{ name_prefix }}_eip[count.index].id
+
+  depends_on = [ aws_eip.{{ name_prefix }}_eip, aws_instance.{{ name_prefix }}_vm ]
+}
+
+# --- Optional Route53 records per instance ---
+resource "aws_route53_record" "{{ name_prefix }}_dns" {
+  count   = var.create_public_ip && length(var.dns_zone_id) > 0 ? var.vm_count : 0
+  zone_id = var.dns_zone_id
+  name    = format("%s-vm-%02d.%s", var.name_prefix, count.index, var.dns_domain)
+  type    = "A"
+  ttl     = 300
+  records = [ aws_eip.{{ name_prefix }}_eip[count.index].public_ip ]
+
+  depends_on = [ aws_eip_association.{{ name_prefix }}_eip_assoc ]
+}
+
+# --- Outputs ---
+output "public_ips" {
+  value = var.create_public_ip ? aws_eip.{{ name_prefix }}_eip[*].public_ip : aws_instance.{{ name_prefix }}_vm[*].public_ip
+}
+
+output "ssh_connections" {
+  value = [
+    for i in range(var.vm_count) :
+    format("ssh -i %s %s@%s", var.private_key_path, var.ssh_user, (
+      var.create_public_ip ? aws_eip.{{ name_prefix }}_eip[i].public_ip : aws_instance.{{ name_prefix }}_vm[i].public_ip
+    ))
+  ]
+}
+
+{%- elif cloud == "gcp" or cloud == "gcloud" %}
+
+provider "google" {
+  project = "{{ project | default('') }}"
+  region  = "{{ region }}"
+  zone    = "{{ zone | default(region + '-a') }}"
+}
+
+resource "google_compute_network" "{{ name_prefix }}_vpc" {
+  name                    = "{{ name_prefix }}-vpc"
+  auto_create_subnetworks = false
+  routing_mode            = "REGIONAL"
+}
+
+resource "google_compute_subnetwork" "{{ name_prefix }}_subnet" {
+  name          = "{{ name_prefix }}-subnet"
+  ip_cidr_range = "{{ subnet_cidr }}"
+  region        = "{{ region }}"
+  network       = google_compute_network.{{ name_prefix }}_vpc.self_link
+  private_ip_google_access = true
+  labels = {{ tags | default({}) | tojson }}
+}
+
+resource "google_compute_firewall" "{{ name_prefix }}_fw" {
+  name    = "{{ name_prefix }}-fw"
+  network = google_compute_network.{{ name_prefix }}_vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["{{ name_prefix }}-vm"]
+}
+
+resource "google_compute_address" "{{ name_prefix }}_addr" {
+  count = {{ vm_count | int }} * ({{ create_public_ip | default(false) | ternary(1,0) }})
+  name  = "${format(\"%s-addr-%02d\", \"{{ name_prefix }}\", count.index)}"
+  region = "{{ region }}"
+}
+
+resource "google_compute_instance" "{{ name_prefix }}_vm" {
+  count        = {{ vm_count | int }}
+  name         = "${format(\"%s-vm-%02d\", \"{{ name_prefix }}\", count.index)}"
+  machine_type = "{{ instance_type }}"
+  zone         = "{{ zone | default(region + '-a') }}"
+
+  boot_disk { initialize_params { image = "{{ image }}" } }
+
+  network_interface {
+    network    = google_compute_network.{{ name_prefix }}_vpc.self_link
+    subnetwork = google_compute_subnetwork.{{ name_prefix }}_subnet.self_link
+    access_config {
+      {% if create_public_ip %}
+      nat_ip = google_compute_address.{{ name_prefix }}_addr[count.index].address
+      {% else %}
+      # ephemeral/public if omitted: access_config {}
+      {% endif %}
+    }
+  }
+
+  metadata = {
+    ssh-keys = "{{ ssh_user | default('terraform') }}:{{ ssh_public_key | replace('\n','\\n') }}"
+  }
+
+  labels = {{ tags | default({}) | tojson }}
+}
+
+{%- if gcp_managed_zone and dns_domain %}
+resource "google_dns_record_set" "{{ name_prefix }}_dns" {
+  count = {{ vm_count | int }}
+  name  = "${format(\"%s-vm-%02d.%s.\", \"{{ name_prefix }}\", count.index, \"{{ dns_domain }}\")}"
+  managed_zone = "{{ gcp_managed_zone }}"
+  type  = "A"
+  ttl   = 300
+  rrdatas = [
+    {% if create_public_ip %}
+    google_compute_address.{{ name_prefix }}_addr[count.index].address
+    {% else %}
+    google_compute_instance.{{ name_prefix }}_vm[count.index].network_interface[0].access_config[0].nat_ip
+    {% endif %}
+  ]
+}
+{%- endif %}
+
+{%- elif cloud == "azure" %}
+
+provider "azurerm" {
+  features = {}
+}
+
+resource "azurerm_resource_group" "{{ name_prefix }}_rg" {
+  name     = "{{ name_prefix }}-rg"
+  location = "{{ region }}"
+  tags     = {{ tags | default({}) | tojson }}
+}
+
+resource "azurerm_virtual_network" "{{ name_prefix }}_vnet" {
+  name                = "{{ name_prefix }}-vnet"
+  address_space       = ["{{ cidr_block }}"]
+  location            = azurerm_resource_group.{{ name_prefix }}_rg.location
+  resource_group_name = azurerm_resource_group.{{ name_prefix }}_rg.name
+  tags                = {{ tags | default({}) | tojson }}
+}
+
+resource "azurerm_subnet" "{{ name_prefix }}_subnet" {
+  name                 = "{{ name_prefix }}-subnet"
+  resource_group_name  = azurerm_resource_group.{{ name_prefix }}_rg.name
+  virtual_network_name = azurerm_virtual_network.{{ name_prefix }}_vnet.name
+  address_prefixes     = ["{{ subnet_cidr }}"]
+}
+
+resource "azurerm_network_security_group" "{{ name_prefix }}_nsg" {
+  name                = "{{ name_prefix }}-nsg"
+  location            = azurerm_resource_group.{{ name_prefix }}_rg.location
+  resource_group_name = azurerm_resource_group.{{ name_prefix }}_rg.name
+
+  security_rule {
+    name                       = "Allow-SSH"
+    priority                   = 1001
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  tags = {{ tags | default({}) | tojson }}
+}
+
+{%- for i in range(vm_count|int) %}
+resource "azurerm_public_ip" "{{ name_prefix }}_pip_{{ i }}" {
+  count               = {{ create_public_ip | default(false) | ternary(1,0) }}
+  name                = "${format(\"%s-pip-%02d\", \"{{ name_prefix }}\", count.index)}"
+  location            = azurerm_resource_group.{{ name_prefix }}_rg.location
+  resource_group_name = azurerm_resource_group.{{ name_prefix }}_rg.name
+  allocation_method   = "Static"
+  sku                 = "Basic"
+}
+
+# attach to NIC ip_configuration
+resource "azurerm_network_interface" "{{ name_prefix }}_nic" {
+  count               = {{ vm_count | int }}
+  name                = "${format(\"%s-nic-%02d\", \"{{ name_prefix }}\", count.index)}"
+  location            = azurerm_resource_group.{{ name_prefix }}_rg.location
+  resource_group_name = azurerm_resource_group.{{ name_prefix }}_rg.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.{{ name_prefix }}_subnet.id
+    private_ip_address_allocation = "Dynamic"
+    {% if create_public_ip %}
+    public_ip_address_id = azurerm_public_ip.{{ name_prefix }}_pip_{{ i }}[0].id
+    {% endif %}
+  }
+
+  tags = {{ tags | default({}) | tojson }}
+}
+{%- endfor %}
+
+{%- if azure_dns_rg and azure_dns_zone_name %}
+data "azurerm_dns_zone" "{{ name_prefix }}_zone" {
+  name                = "{{ azure_dns_zone_name }}"
+  resource_group_name = "{{ azure_dns_rg }}"
+}
+
+resource "azurerm_dns_a_record" "{{ name_prefix }}_dns" {
+  count               = {{ vm_count | int }}
+  name                = "${format(\"%s-vm-%02d\", \"{{ name_prefix }}\", count.index)}"
+  zone_name           = data.azurerm_dns_zone.{{ name_prefix }}_zone.name
+  resource_group_name = data.azurerm_dns_zone.{{ name_prefix }}_zone.resource_group_name
+  ttl                 = 300
+  records             = [
+    {% if create_public_ip %}
+    azurerm_public_ip.{{ name_prefix }}_pip_0[*].ip_address[count.index] # note: index mapping per count
+    {% else %}
+    element(azurerm_network_interface.{{ name_prefix }}_nic.*.ip_configuration[0].private_ip_address, count.index)
+    {% endif %}
+  ]
+}
+{%- endif %}
+
+{%- else %}
+
+# Unsupported cloud provider: {{ cloud }}
+# Supported values: "aws", "gcp"/"gcloud", "azure"
+
+{%- endif %}

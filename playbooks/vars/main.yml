@@ -1,0 +1,23 @@
+---
+
+packages:
+  - python-pip
+  - python3-firewall
+  - firewalld
+  - vim
+  - curl
+  - cockpit
+  - podman
+  - chrony
+
+users:
+  - login: "ops"
+    group: "wheel"
+
+fw_rules:
+  - port: 9090
+    protocol: "tcp"
+
+services:
+  - "cockpit.service"
+  - "firewalld.service"

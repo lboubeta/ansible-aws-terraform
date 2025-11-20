@@ -1,0 +1,142 @@
+# Projects, Inventories, Inventory Sources, Labels, Credentials, Execution Environments, Job Templates, Workflow Job Templates
+
+rh_certified_token: "<your_published_token_here>" # Replace with your actual Red Hat Certified token
+
+slack_token: "<your_slack_token_here>" # Replace with your actual Slack token
+
+### ROLES ###
+
+controller_roles:
+  - role: member
+    users:
+      - "infra"
+    target_team: "Operators"
+  - role: member
+    users:
+      - "bob"
+    target_team: "Developers"
+  - role: admin
+    users:
+      - "admin"
+      - "infra"
+    target_team: "Admins"
+
+### PROJECT ###
+
+controller_projects:
+  - name: Logista AAP PoC
+    organization: Logista
+    description: Project for managing Logista controller configurations
+    scm_branch: main
+    scm_clean: 'no'
+    scm_update_on_launch: 'no'
+    scm_type: git
+    scm_url: <your_git_repo_here> # Replace with your actual Git repository URL
+
+### INVENTORY ###
+
+controller_inventories:
+  - name: Logista Inventory
+    organization: Logista
+    description: Inventory for Logista hosts
+
+### HOSTS ###
+
+controller_hosts:
+  - name: localhost
+    inventory: Logista Inventory
+    description: Localhost for testing purposes
+    enabled: true
+    variables:
+      ansible_connection: local
+
+### LABELS ###
+
+controller_labels:
+  - name: vmware
+    organization: Logista
+  - name: linux
+    organization: Logista
+  - name: windows
+    organization: Logista
+
+### CREDENTIALS ###
+
+controller_credentials:
+  - name: Linux Credential
+    description: Credential for Linux hosts
+    organization: CaC
+    credential_type: Machine
+    inputs:
+      username: root
+      password: "admin123!" # This is just an example, use vault or other secure methods in production
+  - name: "Red Hat Published"
+    description: "Red Hat Published Galaxy Credential"
+    credential_type: "Ansible Galaxy/Automation Hub API Token"
+    organization: CaC
+    inputs:
+      url: https://console.redhat.com/api/automation-hub/content/published/
+      auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+      token: "{{ rh_certified_token }}"
+  - name: "Red Hat Verified"
+    description: "Red Hat Verified Galaxy Credential"
+    credential_type: "Ansible Galaxy/Automation Hub API Token"
+    organization: CaC
+    inputs:
+      url: https://console.redhat.com/api/automation-hub/content/verified/
+      auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+      token: "{{ rh_certified_token }}"
+  - name: "GitHub PAT"
+    description: "GitHub Personal Access Token"
+    organization: CaC
+    credential_type: "GitHub Personal Access Token"
+    inputs:
+      token: <your_github_pat_here> # Replace with your actual GitHub PAT
+
+
+### EXECUTION ENVIRONMENT ###
+
+controller_execution_environments:
+  - name: CaC EE
+    # organization: CaC
+    image: <your_ee_image_here> # Replace with your actual EE image
+
+
+### JOB TEMPLATES ###
+
+controller_templates:
+  ### 1. Job Template ###
+  - name: "[DEV] Create Git Project"
+    description: Job template to create Git project
+    job_type: run
+    inventory: Default Summit Connect Inventory
+    project: Summit25 CICD Project
+    playbook: ansible/init-git-repo.yml
+    credential: Linux Credential
+    organization: CaC
+    allow_simultaneous: true
+    notification_templates_success:
+      - Slack Summit
+    labels:
+      - CaC
+    survey_enabled: true
+    survey_spec:
+      name: New Project Name
+      description: Name of the new AAP project to create
+      spec:
+        - question_name: New Project Name
+          question_description: Enter the name for the new AAP project
+          required: true
+          type: text
+          max: 50
+          variable: new_repo_name
+          default: "New_AAP_Project"
+          new_question: true
+        - question_name: New Project Description
+          question_description: Enter a description for the new AAP project
+          required: false
+          type: text
+          max: 100
+          variable: new_repo_description
+          default: "Repository for new AAP project"
+          new_question: true
