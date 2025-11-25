@@ -1,0 +1,43 @@
+---
+
+- name: Crear bucket S3 para Terraform state
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    bucket_name: "lboubeta-tfstate-bucket"
+    region: "eu-west-1"
+
+  tasks:
+    - name: Validate that bucket_name is provided
+      ansible.builtin.assert:
+        that:
+          - bucket_name != ""
+        fail_msg: "El nombre del bucket no puede estar vacío. Por favor, proporciona un nombre válido."
+
+    - name: Ensure the S3 bucket exists
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"
+        state: present
+        region: "{{ region }}"
+        versioning: false   # ❗IMPORTANTE: Sin versioning para evitar problemas al borrar
+      register: bucket_info
+      tags: create
+
+    - name: Display bucket creation result
+      ansible.builtin.debug:
+        msg:
+          bucket: "{{ bucket_name }}"
+          region: "{{ region }}"
+          tf_state_path: "terraform.tfstate"
+      when: bucket_info.changed
+      tags: create
+
+    - name: Destroy the S3 bucket if needed
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"
+        state: absent
+        force: true
+      tags: 
+        - destroy
+        - never

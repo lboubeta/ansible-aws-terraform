@@ -1,0 +1,38 @@
+---
+
+- name: Prepare OS with minimum requirements
+  hosts: all
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: Install list of packages
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ packages }}"
+      tags: packages
+
+    - name: Create user "ops" and add it to wheel group
+      ansible.builtin.user:
+        name: "{{ item.login }}"
+        group: "{{ item.group }}"
+        state: present
+      loop: "{{ users }}"
+      tags: user
+
+    - name: Enable list of services in RHEL boot
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop: "{{ services }}"
+      tags: service
+
+    - name: Add cockpit port 9090 to firewalld rule
+      ansible.posix.firewalld:
+        port: "{{ item.port }}/{{ item.protocol }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop: "{{ fw_rules }}"
+      tags: net

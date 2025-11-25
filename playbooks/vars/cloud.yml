@@ -3,11 +3,10 @@
 
 cloud: "aws"                     # "aws" | "gcp" | "azure"
 name_prefix: "test"           # used for resource names
-region: "eu-north-1"              # AWS/Azure region or GCP region base
+region: "eu-west-1"              # AWS/Azure region or GCP region base
 zone: ""                         # optional GCP/AZ zone (e.g. "us-east1-b")
 project: ""                      # GCP project id (optional)
 create_public_ip: true            # whether to create public IPs for VMs
-
 
 # Networking
 cidr_block: "10.0.0.0/16"
@@ -19,7 +18,10 @@ dns_domain: "example.com"          # domain for DNS records (leave empty to omit
 # VM specifics
 vm_count: 1
 instance_type: "t3.micro"        # AWS / GCP / Azure sizes as appropriate
+
 # image: used for AWS (AMI id) and GCP (image family or project/image); Azure uses azure_image map
+#     Windows ami: "ami-0f4dbc4289c547d4d"
+#     RHEL ami: "ami-0c4b8477135926c4f"
 image: "ami-0c4b8477135926c4f"                        # e.g. "ami-0123456789abcdef0" or "debian-cloud/debian-11"
 
 # # Azure image reference (used by azurerm source_image_reference)
@@ -30,7 +32,7 @@ image: "ami-0c4b8477135926c4f"                        # e.g. "ami-0123456789abcd
 #   version:   "latest"
 
 # SSH / user
-ssh_public_key: "{{ lookup('file', 'files/id_rsa.pub') }}"               # prefer: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}" stored via vault if needed
+ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"               # prefer: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}" stored via vault if needed
 ssh_user: "lboubeta"                     # username to create/use on VMs (template defaults apply if empty)
 
 # Tags / labels
@@ -53,9 +55,9 @@ tags: {}                         # map/dict of tags/labels to attach to resource
 # terraform_vars_file: ""          # optional path to a generated terraform.tfvars.json or similar
 
 # Terraform backend (S3 + optional DynamoDB locking)
-backend_s3_bucket: "my-terraform-state-bucket"            # required: S3 bucket name
+backend_s3_bucket: "lboubeta-tfstate-bucket"            # required: S3 bucket name
 backend_s3_key: "test/terraform.tfstate"            # path/key inside bucket
-backend_region: "eu-north-1"                          # region of the bucket (defaults to aws_region if omitted)
+backend_region: "eu-west-1"                          # region of the bucket (defaults to aws_region if omitted)
 backend_encrypt: true                                  # enable SSE
 backend_dynamodb_table: "test-tf-locks"               # optional: DynamoDB table name for locks (create separately or set create_backend_resources)
 create_backend_resources: false                          # set true only for a bootstrap run

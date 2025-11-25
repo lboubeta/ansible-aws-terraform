@@ -4,7 +4,7 @@
   hosts: localhost
   gather_facts: false
   vars:
-    output_dir: "{{ playbook_dir }}/terraform"  # Adjust this path as needed
+    output_dir: "{{ playbook_dir }}/{{ project_name }}"  # Adjust this path as needed
   vars_files:
     - vars/cloud.yml
   tasks:
@@ -28,18 +28,39 @@
         mode: "0644"
         owner: "lboubeta"
 
-    - name: Run terraform init
-      ansible.builtin.command: terraform init
-      args:
-        chdir: "{{ output_dir }}"
-      register: terraform_init
+    # - name: Run terraform init
+    #   ansible.builtin.command: terraform init
+    #   args:
+    #     chdir: "{{ output_dir }}"
+    #   environment:
+    #     TF_CLI_ARGS: "-no-color"
+    #   register: terraform_init
 
-    - name: Run terraform apply
-      ansible.builtin.command: terraform apply -auto-approve
-      args:
-        chdir: "{{ output_dir }}"
+    - name: Define the backend configuration at init
+      cloud.terraform.terraform:
+        project_path: '{{ playbook_dir }}/{{ project_name }}'
+        state: present
+        force_init: true
+        backend_config:
+          region: "eu-west-1"
+          bucket: "lboubeta-tfstate-bucket"
+          key: "terraform.tfstate"
       register: terraform_apply
+
+    # - name: Run terraform apply
+    #   ansible.builtin.command: terraform apply -auto-approve
+    #   args:
+    #     chdir: "{{ output_dir }}"
+    #   environment:
+    #     TF_CLI_ARGS: "-no-color"
+    #   register: terraform_apply
 
     - name: Display Terraform apply output
       ansible.builtin.debug:
         var: terraform_apply.stdout_lines
+      when: terraform_apply.changed
+
+    - name: Display Terraform apply output
+      ansible.builtin.debug:
+        var: terraform_apply.stdout_errors
+      when: terraform_apply.failed

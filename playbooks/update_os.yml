@@ -1,0 +1,20 @@
+---
+
+- name: Update RHEL OS
+  hosts: all
+  become: true
+  tasks:
+    - name: Update all packages
+      ansible.builtin.package:
+        name: "*"
+        state: latest
+
+    - name: Reboot the server if wanted
+      ansible.builtin.reboot:
+        msg: Reboot initiated by Ansible
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: uptime
+      when: reboot_server == "yes"
