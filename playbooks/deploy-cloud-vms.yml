@@ -65,6 +65,7 @@
         content: |
           #!/bin/sh
           exec ssh -i {{ playbook_dir }}/repo/.ssh/aws_test_id_rsa -o StrictHostKeyChecking=no "$@"
+      tags: push
 
     - name: Create .gitignore for Terraform
       ansible.builtin.copy:
