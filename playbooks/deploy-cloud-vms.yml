@@ -15,6 +15,7 @@
         dest: '{{ playbook_dir }}/repo'
         version: 'main'
         force: yes
+      tags: clone
 
     - name: Ensure output directory exists
       ansible.builtin.file:
