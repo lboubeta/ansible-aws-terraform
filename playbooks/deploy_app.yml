@@ -1,29 +1,52 @@
 ---
-- hosts: all
+- name: Deploy application
+  hosts: all
   tasks:
-  - name: Installing podman
-    ansible.builtin.package:
-      name: "podman"
-      state: present
+    - name: Installing podman
+      ansible.builtin.package:
+        name: "podman"
+        state: present
 
-  - name: Pull an image
-    containers.podman.podman_image:
-      name: docker.io/library/httpd:latest
-      state: present
+    - name: Install firewall python module
+      ansible.builtin.package:
+        name: "python3-firewall"
+        state: present
 
-  - name: Copying file into home
-    ansible.builtin.copy:
-      src: templates/index.html
-      dest: /home
+    - name: Pull an image
+      containers.podman.podman_image:
+        name: registry.redhat.io/rhel9/httpd-24
 
-  - name: Re-create container
-    containers.podman.podman_container:
-      name: sarthak
-      image: docker.io/library/httpd:latest
-      state: started
-      detach: true
-      exposed_ports:
-        - 80
-      ports:
-        - 4444:80
-      volumes: /home/:/usr/local/apache2/htdocs/
+    - name: Copying file into home
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/files/index.html"
+        dest: /home
+        mode: "0644"
+        owner: root
+
+    - name: Create the HTTPD container
+      containers.podman.podman_container:
+        name: rhel9
+        image: httpd-24
+        state: started
+        detach: true
+        exposed_ports:
+          - 80
+        ports:
+          - 4444:80
+        volumes: /home/:/usr/local/apache2/htdocs/
+        restart_policy: unless-stopped
+
+    - name: Open port 4444 in the firewall
+      ansible.posix.firewalld:
+        port: 4444/tcp
+        permanent: true
+        state: enabled
+        immediate: true
+
+    - name: Wait for HTTPD to start
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 4444
+        delay: 10
+        timeout: 60
+        state: started

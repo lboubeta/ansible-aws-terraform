@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Info</title>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Display the current time
+      const timeElement = document.getElementById('time');
+      const updateTime = () => {
+        const now = new Date();
+        timeElement.textContent = now.toLocaleString();
+      };
+      updateTime();
+      setInterval(updateTime, 1000); // Update time every second
+
+      // Display host and port (static values since httpd doesn't provide them dynamically)
+      document.getElementById('host').textContent = window.location.hostname;
+      document.getElementById('port').textContent = window.location.port || '80';
+    });
+  </script>
+</head>
+<body>
+  <h1>Server Information</h1>
+  <p><strong>Host:</strong> <span id="host">Loading...</span></p>
+  <p><strong>Port:</strong> <span id="port">Loading...</span></p>
+  <p><strong>Time:</strong> <span id="time">Loading...</span></p>
+</body>
+</html>
