@@ -4,10 +4,18 @@
   hosts: localhost
   gather_facts: false
   vars:
-    output_dir: "{{ playbook_dir }}/{{ project_name }}"  # Adjust this path as needed
+    output_dir: "{{ playbook_dir }}/repo/tf_{{ name_prefix }}"  # Adjust this path as needed
   vars_files:
     - vars/cloud.yml
   tasks:
+
+    - name: Clone the repository with Terraform templates
+      ansible.builtin.git:
+        repo: 'git@github.com:lboubeta/ansible-aws-terraform.git'
+        dest: '{{ playbook_dir }}/repo'
+        version: 'main'
+        force: yes
+
     - name: Ensure output directory exists
       ansible.builtin.file:
         path: "{{ output_dir }}"
@@ -28,17 +36,9 @@
         mode: "0644"
         owner: "lboubeta"
 
-    # - name: Run terraform init
-    #   ansible.builtin.command: terraform init
-    #   args:
-    #     chdir: "{{ output_dir }}"
-    #   environment:
-    #     TF_CLI_ARGS: "-no-color"
-    #   register: terraform_init
-
     - name: Define the backend configuration at init
       cloud.terraform.terraform:
-        project_path: '{{ playbook_dir }}/{{ project_name }}'
+        project_path: '{{ output_dir }}'
         state: present
         force_init: true
         backend_config:
@@ -46,14 +46,6 @@
           bucket: "lboubeta-tfstate-bucket"
           key: "terraform.tfstate"
       register: terraform_apply
-
-    # - name: Run terraform apply
-    #   ansible.builtin.command: terraform apply -auto-approve
-    #   args:
-    #     chdir: "{{ output_dir }}"
-    #   environment:
-    #     TF_CLI_ARGS: "-no-color"
-    #   register: terraform_apply
 
     - name: Display Terraform apply output
       ansible.builtin.debug:
@@ -64,3 +56,37 @@
       ansible.builtin.debug:
         var: terraform_apply.stdout_errors
       when: terraform_apply.failed
+
+    - name: Create ssh wrapper script
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/repo/git_ssh.sh"
+        mode: "0700"
+        content: |
+          #!/bin/sh
+          exec ssh -i {{ playbook_dir }}/repo/.ssh/aws_test_id_rsa -o StrictHostKeyChecking=no "$@"
+
+    - name: Create .gitignore for Terraform
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/repo/.gitignore"
+        content: |
+          # Terraform
+          *.tfstate
+          *.tfstate.backup
+          tf_{{ name_prefix }}/.terraform/
+          tf_{{ name_prefix }}/.terraform.lock.hcl
+        mode: "0644"
+      tags: push
+
+    - name: Push new terraform project to git
+      ansible.builtin.shell: |
+        git add tf_{{ name_prefix }}
+        git commit -m "Add new terraform project {{ name_prefix }}" || true
+        git push origin main
+      args:
+        chdir: "{{ playbook_dir }}/repo"
+      environment:
+        GIT_SSH_COMMAND: "{{ playbook_dir }}/repo/git_ssh.sh"
+      register: git_push
+      failed_when: git_push.rc != 0 and 'nothing to commit' not in git_push.stdout
+      changed_when: "'nothing to commit' not in git_push.stdout"
+      tags: push
