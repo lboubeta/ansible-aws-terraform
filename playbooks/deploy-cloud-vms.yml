@@ -36,7 +36,7 @@
     - name: Define the backend configuration at init
       cloud.terraform.terraform:
         project_path: '{{ output_dir }}'
-        state: present
+        state: "{{ infrastructure_state | default('present') }}"
         force_init: true
         backend_config:
           region: "eu-west-1"
