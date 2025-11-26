@@ -79,7 +79,7 @@ variable "win25_owner" {
 variable "key_name" {
   description = "SSH key pair name in AWS"
   type        = string
-  default     = "{{ key_name | default('deployer') }}"
+  default     = "{{ name_prefix }}_key"
 }
 
 variable "public_key_path" {
