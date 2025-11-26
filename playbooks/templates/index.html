@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/styles.css">
+    <title>Secure Payment</title>
+</head>
+<body>
+    <div class="app-container">
+        <div class="phone-frame" id="blur-container">
+            <div class="status-bar">
+                <div class="notch"></div>
+            </div>
+            <div class="app-content">
+                <header>
+                    <div class="header-container">
+                        <h1>Secure Payment</h1>
+                    </div>
+                </header>
+                <main>
+                    <div class="payment-container">
+                        <h2>Pay with Confidence</h2>
+                        <form id="payment-form">
+                            <label for="amount">Amount</label>
+                            <input type="number" id="amount" name="amount" placeholder="Enter amount" required>
+                            <label for="currency">Currency</label>
+                            <input type="text" id="currency" name="currency" placeholder="e.g., USD" required>
+                            <button type="submit">Proceed to Pay</button>
+                        </form>
+                        <div id="response"></div>
+                    </div>
+                </main>
+                <footer>
+                    <p></p>
+                </footer>
+            </div>
+        </div>
+        <div id="loading-overlay" class="hidden">
+            <div class="spinner"></div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('payment-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Show loading overlay
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            document.getElementById('blur-container').classList.add('blurred');
+
+            // Simulate fake delay
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const amount = parseFloat(document.getElementById('amount').value);
+            const currency = document.getElementById('currency').value;
+
+            try {
+                const response = await fetch('/api/pay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount, currency }),
+                });
+                const result = await response.json();
+
+                const responseElement = document.getElementById('response');
+                if (result.status === "success") {
+                    responseElement.className = "success";
+                    responseElement.innerText = result.message;
+                } else {
+                    responseElement.className = "error";
+                    responseElement.innerText = result.error || "An error occurred.";
+                }
+            } catch (error) {
+                const responseElement = document.getElementById('response');
+                responseElement.className = "error";
+                responseElement.innerText = "An error occurred while processing the payment.";
+            } finally {
+                // Hide loading overlay
+                document.getElementById('loading-overlay').classList.add('hidden');
+                document.getElementById('blur-container').classList.remove('blurred');
+            }
+        });
+    </script>
+</body>
+</html>

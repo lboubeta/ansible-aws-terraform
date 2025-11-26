@@ -5,17 +5,21 @@
     ansible.builtin.package:
       name: "podman"
       state: present
+
   - name: Pull an image
     containers.podman.podman_image:
-      name: httpd
+      name: docker.io/library/httpd:latest
+      state: present
+
   - name: Copying file into home
     ansible.builtin.copy:
-      src: /root/ws1/index.html
+      src: index.html
       dest: /home
-  - name: Re-create a redis container
+
+  - name: Re-create container
     containers.podman.podman_container:
       name: sarthak
-      image: httpd
+      image: docker.io/library/httpd:latest
       state: started
       detach: true
       exposed_ports:
