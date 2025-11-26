@@ -21,7 +21,7 @@ image: "ami-0c4b8477135926c4f"                        # e.g. "ami-0123456789abcd
 
 # SSH
 # prefer: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}" stored via vault if needed
-ssh_public_key: "{{ lookup('file', playbook_dir + '/../.ssh/id_rsa.pub') }}"               
+ssh_public_key: "{{ lookup('file', playbook_dir + '/../.ssh/aws_test_id_rsa.pub') }}"
 
 # Tags / labels
 tags: {}                         # map/dict of tags/labels to attach to resources
