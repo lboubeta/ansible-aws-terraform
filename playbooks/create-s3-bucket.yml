@@ -38,6 +38,6 @@
         name: "{{ bucket_name }}"
         state: absent
         force: true
-      tags: 
+      tags:
         - destroy
         - never

@@ -4,6 +4,12 @@ variable "name_prefix" {
   default     = "{{ name_prefix | default('logista') }}"
 }
 
+variable "vm_name" {
+  description = "Name for the vm based on project and type"
+  type        = string
+  default     = "{{ type | default('linux') }}_{{ name_prefix | default('logista') }}"
+}
+
 variable "aws_region" {
   description = "AWS region"
   type        = string
@@ -62,6 +68,13 @@ variable "rhel9_owner" {
   type        = string
   default     = "{{ rhel9_owner | default('309956199498') }}"
 }
+
+variable "win25_owner" {
+  description = "Owner ID used when looking up WIN-Server-2025 AMI"
+  type        = string
+  default     = "{{ rhel9_owner | default('801119661308') }}"
+}
+
 
 variable "key_name" {
   description = "SSH key pair name in AWS"

@@ -101,42 +101,55 @@ resource "aws_key_pair" "{{ name_prefix }}_key" {
   public_key = file(var.public_key_path)
 }
 
-# --- AMI lookup (RHEL9 default) ---
-data "aws_ami" "{{ name_prefix }}_rhel9" {
+{% if type == "linux" %}
+# --- AMI lookup (RHEL9) ---
+data "aws_ami" "{{ type }}_{{ name_prefix }}" {
   most_recent = true
-  owners      = [var.rhel9_owner]
+  owners = [var.rhel9_owner]
 
   filter {
     name   = "name"
     values = ["RHEL-9.*x86_64*"]
   }
 }
+{% elif type == "windows" %}
+# --- AMI lookup (Windows) ---
+data "aws_ami" "{{ type }}_{{ name_prefix }}" {
+  most_recent = true
+  owners = [var.win25_owner]
+
+  filter {
+    name   = "name"
+    values = ["Windows_Server-2025-English-Full-Base-2025.11.12"]
+  }
+}
+{% endif %}
 
 # --- EC2 instances ---
-resource "aws_instance" "{{ name_prefix }}_vm" {
+resource "aws_instance" "{{ type }}_{{ name_prefix }}" {
   count                      = var.vm_count
-  ami                        = coalesce(var.ami_id, data.aws_ami.{{ name_prefix }}_rhel9.id)
+  ami                        = coalesce(var.ami_id, data.aws_ami.{{ type }}_{{ name_prefix }}.id)
   instance_type              = var.instance_type
   subnet_id                  = aws_subnet.{{ name_prefix }}_public_subnet.id
   vpc_security_group_ids     = [aws_security_group.{{ name_prefix }}_sg.id]
   associate_public_ip_address = true
   key_name                   = aws_key_pair.{{ name_prefix }}_key.key_name
 
-  tags = merge({ Name = format("%s-vm-%02d", var.name_prefix, count.index) }, var.tags)
+  tags = merge({ Name = format("%s_%02d", var.vm_name, count.index), Deployment = "terraform", Family = "{{ type }}" }, var.tags)
 
   user_data = var.user_data
 }
 
 # --- Outputs ---
 output "public_ips" {
-  value = aws_instance.{{ name_prefix }}_vm[*].public_ip
+  value = aws_instance.{{ type }}_{{ name_prefix }}[*].public_ip
 }
 
 output "ssh_connections" {
   value = [
     for i in range(var.vm_count) :
     format("ssh -i %s %s@%s", var.private_key_path, var.ssh_user, (
-      aws_instance.{{ name_prefix }}_vm[i].public_ip
+      aws_instance.{{ type }}_{{ name_prefix }}[i].public_ip
     ))
   ]
 }
