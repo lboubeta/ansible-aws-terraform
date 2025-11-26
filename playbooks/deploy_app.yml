@@ -13,7 +13,7 @@
 
   - name: Copying file into home
     ansible.builtin.copy:
-      src: index.html
+      src: templates/index.html
       dest: /home
 
   - name: Re-create container
