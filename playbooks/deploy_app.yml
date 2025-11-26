@@ -12,6 +12,12 @@
         name: "python3-firewall"
         state: present
 
+    - name: Login to Red Hat registry
+      containers.podman.podman_login:
+        registry: registry.redhat.io
+        username: "{{ rh_registry_username }}"
+        password: "{{ rh_registry_password }}"
+
     - name: Pull an image
       containers.podman.podman_image:
         name: registry.redhat.io/rhel9/httpd-24
