@@ -11,7 +11,7 @@
 
     - name: Clone the repository with Terraform templates
       ansible.builtin.git:
-        repo: 'git@github.com:lboubeta/terraform-example.git'
+        repo: '{{ plan_repo_url }}'
         dest: '{{ tf_plan_dir }}'
         version: 'main'
         force: true
