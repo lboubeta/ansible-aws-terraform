@@ -15,6 +15,7 @@
         dest: '{{ tf_plan_dir }}'
         version: 'main'
         force: true
+        accept_hostkey: true
       tags: clone
 
     - name: Define the backend configuration at init
