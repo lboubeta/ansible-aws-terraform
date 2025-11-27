@@ -1,0 +1,46 @@
+---
+- name: Deploy VM from template
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Deploy a new VM based on template with fixed IP
+      when: vm_ip is defined and vm_ip != ""
+      community.vmware.vmware_guest:
+        name: "{{ vm_name }}"
+        template: "{{ template_id }}"
+        datacenter: "{{ datacenter_name }}"
+        cluster: "{{ cluster_name }}"
+        folder: "{{ folder_name }}"
+        state: powered-on
+        datastore: "{{ datastore_name }}"
+        hardware:
+          num_cpus: "{{ vm_cpu_num }}"
+          hotadd_cpu: true
+          hotremove_cpu: true
+          memory_mb: "{{ vm_mem_mb }}"
+          hotadd_memory: true
+        customization:
+          hostname: "{{ vm_name }}"
+        networks:
+          - vlan: "{{ vlan_id }}"
+            device_type: "vmxnet3"
+            start_connected: true
+            ip: "{{ vm_ip }}"
+            gateway: "0.0.0.0"
+            netmask: "255.255.255.0"
+            type: static
+            dns_servers: 8.8.8.8
+            domain: "redhat.test"
+        wait_for_ip_address: true
+        wait_for_customization: false
+      register: my_vm
+
+    - name: Search new Virtual Machine
+      community.vmware.vmware_guest_info:
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ vm_name }}-aap"
+      register: data
+
+    - name: Show data from new vm
+      ansible.builtin.debug:
+        var: data

@@ -9,6 +9,7 @@ packages:
   - cockpit
   - podman
   - chrony
+  - net-tools
 
 users:
   - login: "ops"
