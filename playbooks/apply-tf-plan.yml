@@ -24,7 +24,7 @@
         force_init: true
         backend_config:
           region: "eu-west-1"
-          bucket: "test-tfstate-bucket"
+          bucket: "wintest-tfstate-bucket"
           key: "terraform.tfstate"
       register: terraform_apply
 
