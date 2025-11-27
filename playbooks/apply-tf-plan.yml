@@ -4,15 +4,15 @@
   hosts: localhost
   gather_facts: false
   vars:
-    tf_plan_dir: "{{ playbook_dir }}/repo/terraform"  # Adjust this path as needed
+    tf_plan_dir: "{{ playbook_dir }}/terraform"  # Adjust this path as needed
   vars_files:
     - vars/cloud.yml
   tasks:
 
     - name: Clone the repository with Terraform templates
       ansible.builtin.git:
-        repo: 'git@github.com:lboubeta/ansible-aws-terraform.git'
-        dest: '{{ playbook_dir }}/repo'
+        repo: 'git@github.com:lboubeta/terraform-example.git'
+        dest: '{{ tf_plan_dir }}'
         version: 'main'
         force: true
       tags: clone
