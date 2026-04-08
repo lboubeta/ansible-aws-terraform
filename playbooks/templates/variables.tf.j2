@@ -154,7 +154,7 @@ variable "backend_s3_bucket" {
 variable "backend_s3_key" {
   description = "S3 key (path) for the state file, e.g. \"path/to/terraform.tfstate\""
   type        = string
-  default     = "{{ backend_s3_key | default(name_prefix ~ '/terraform.tfstate') }}"
+  default     = "{{ backend_s3_key | default(project_name ~ '/terraform.tfstate') }}"
 }
 
 variable "backend_region" {

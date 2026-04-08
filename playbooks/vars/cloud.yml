@@ -5,6 +5,7 @@ cloud: "aws"                     # "aws" | "gcp" | "azure"
 name_prefix: "techday"           # used for resource names
 region: "eu-west-1"              # AWS/Azure region or GCP region base
 create_public_ip: true            # whether to create public IPs for VMs
+project_name: "perfect-app"           # used for resource names
 
 # Networking
 cidr_block: "10.0.0.0/16"
@@ -28,7 +29,7 @@ cloud_tags: { "terraform":"true", "event":"techtalks", "ansible":"true"}        
 
 # Terraform backend (S3 + optional DynamoDB locking)
 backend_s3_bucket: "techday-tfstate-bucket"            # required: S3 bucket name
-backend_s3_key: "terraform.tfstate"            # path/key inside bucket
+backend_s3_key: "{{ project_name }}/terraform.tfstate"            # path/key inside bucket
 backend_region: "eu-west-1"                          # region of the bucket (defaults to aws_region if omitted)
 # backend_encrypt: true                                  # enable SSE
 # backend_dynamodb_table: "test-tf-locks"               # optional: DynamoDB table name for locks (create separately or set create_backend_resources)
