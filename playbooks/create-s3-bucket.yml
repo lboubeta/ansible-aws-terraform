@@ -28,7 +28,6 @@
         data:
           backend_s3_bucket: "{{ backend_s3_bucket }}"
           backend_region: "{{ backend_region }}"
-          backend_s3_key: "{{ backend_s3_key }}"
           s3_bucket_created: "{{ bucket_info is changed }}"
         per_host: false
       when: bucket_info is succeeded
@@ -37,7 +36,6 @@
       ansible.builtin.set_fact:
         backend_s3_bucket: "{{ backend_s3_bucket }}"
         backend_region: "{{ backend_region }}"
-        backend_s3_key: "{{ backend_s3_key }}"
         s3_bucket_created: "{{ bucket_info is changed }}"
       when: bucket_info is succeeded
 
@@ -57,6 +55,5 @@
         msg:
           bucket: "{{ backend_s3_bucket }}"
           region: "{{ backend_region }}"
-          tf_state_path: "{{ tf_state_key }}"
           note: "Downstream workflow jobs receive backend_s3_* via set_stats; later plays use set_fact."
       tags: create
