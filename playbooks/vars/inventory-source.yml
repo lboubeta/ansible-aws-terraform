@@ -5,7 +5,7 @@ controller_inventory_sources:
     organization: Tech Days
     description: Inventory source for {{ project_name }} hosts
     inventory: Tech Days Inventory
-    source: Terraform State
+    source: terraform
     credential: "{{ project_name }} Inventory Source Credential"
     execution_environment: Terraform EE
     overwrite: true
