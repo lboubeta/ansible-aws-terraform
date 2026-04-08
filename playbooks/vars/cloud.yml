@@ -36,4 +36,5 @@ backend_region: "eu-west-1"                          # region of the bucket (def
 # create_backend_resources: false                          # set true only for a bootstrap run
 
 plan_repo_url: "https://github.com/{{ github_owner }}/{{ project_name }}.git" # URL of the repository to store the plan
-project_group: "tf_{{ project_name }}"
+# Hyphens in project_name become underscores (e.g. perfect-app -> tf_perfect_app)
+project_group: "tf_{{ project_name | replace('-', '_') }}"
