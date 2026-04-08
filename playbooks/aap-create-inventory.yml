@@ -10,4 +10,6 @@
 
     - name: Demo Components
       ansible.builtin.include_role:
-        name: infra.aap_configuration.controller_inventory_sources
+        name: infra.aap_configuration.dispatch
+      vars:
+        controller_dependency_check: false  # noqa: var-naming[no-role-prefix]
