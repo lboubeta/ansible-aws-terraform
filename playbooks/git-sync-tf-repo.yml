@@ -55,7 +55,7 @@
         dest: "{{ terraform_workspace }}"
         version: "{{ github_default_branch }}"
         force: true
-      no_log: true
+      no_log: false
 
     - name: Generate main.tf from template
       ansible.builtin.template:
