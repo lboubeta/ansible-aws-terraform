@@ -4,40 +4,59 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  vars:
-    bucket_name: "lboubeta-tfstate-bucket"
-    region: "eu-west-1"
-
+  vars_files:
+    - vars/cloud.yml
   tasks:
-    - name: Validate that bucket_name is provided
+    - name: Validate that backend_s3_bucket is provided
       ansible.builtin.assert:
         that:
-          - bucket_name != ""
+          - backend_s3_bucket != ""
         fail_msg: "El nombre del bucket no puede estar vacío. Por favor, proporciona un nombre válido."
 
     - name: Ensure the S3 bucket exists
       amazon.aws.s3_bucket:
-        name: "{{ bucket_name }}"
+        name: "{{ backend_s3_bucket }}"
         state: present
-        region: "{{ region }}"
+        region: "{{ backend_region }}"
         versioning: false   # ❗IMPORTANTE: Sin versioning para evitar problemas al borrar
       register: bucket_info
+      notify: Display bucket creation result
       tags: create
 
-    - name: Display bucket creation result
-      ansible.builtin.debug:
-        msg:
-          bucket: "{{ bucket_name }}"
-          region: "{{ region }}"
-          tf_state_path: "terraform.tfstate"
-      when: bucket_info.changed
-      tags: create
+    - name: Publish S3 backend parameters for downstream workflow jobs (AAP / AWX)
+      ansible.builtin.set_stats:
+        data:
+          backend_s3_bucket: "{{ backend_s3_bucket }}"
+          backend_region: "{{ backend_region }}"
+          backend_s3_key: "{{ backend_s3_key }}"
+          s3_bucket_created: "{{ bucket_info is changed }}"
+        per_host: false
+      when: bucket_info is succeeded
+
+    - name: Persist S3 backend parameters as facts for later plays in this playbook run
+      ansible.builtin.set_fact:
+        backend_s3_bucket: "{{ backend_s3_bucket }}"
+        backend_region: "{{ backend_region }}"
+        backend_s3_key: "{{ backend_s3_key }}"
+        s3_bucket_created: "{{ bucket_info is changed }}"
+      when: bucket_info is succeeded
 
     - name: Destroy the S3 bucket if needed
       amazon.aws.s3_bucket:
-        name: "{{ bucket_name }}"
+        name: "{{ backend_s3_bucket }}"
         state: absent
         force: true
       tags:
         - destroy
         - never
+
+  handlers:
+
+    - name: Display bucket creation result
+      ansible.builtin.debug:
+        msg:
+          bucket: "{{ backend_s3_bucket }}"
+          region: "{{ backend_region }}"
+          tf_state_path: "{{ tf_state_key }}"
+          note: "Downstream workflow jobs receive backend_s3_* via set_stats; later plays use set_fact."
+      tags: create

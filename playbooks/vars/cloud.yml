@@ -2,7 +2,7 @@
 # Put secret values into Ansible Vault or your CI secret store.
 
 cloud: "aws"                     # "aws" | "gcp" | "azure"
-name_prefix: "techtalks"           # used for resource names
+name_prefix: "techday"           # used for resource names
 region: "eu-west-1"              # AWS/Azure region or GCP region base
 create_public_ip: true            # whether to create public IPs for VMs
 
@@ -27,9 +27,9 @@ image: "ami-0c4b8477135926c4f"                        # e.g. "ami-0123456789abcd
 cloud_tags: { "terraform":"true", "event":"techtalks", "ansible":"true"}                         # map/dict of tags/labels to attach to resources
 
 # Terraform backend (S3 + optional DynamoDB locking)
-backend_s3_bucket: "lboubeta-tfstate-bucket"            # required: S3 bucket name
-backend_s3_key: "test/terraform.tfstate"            # path/key inside bucket
+backend_s3_bucket: "techday-tfstate-bucket"            # required: S3 bucket name
+backend_s3_key: "terraform.tfstate"            # path/key inside bucket
 backend_region: "eu-west-1"                          # region of the bucket (defaults to aws_region if omitted)
-backend_encrypt: true                                  # enable SSE
-backend_dynamodb_table: "test-tf-locks"               # optional: DynamoDB table name for locks (create separately or set create_backend_resources)
-create_backend_resources: false                          # set true only for a bootstrap run
+# backend_encrypt: true                                  # enable SSE
+# backend_dynamodb_table: "test-tf-locks"               # optional: DynamoDB table name for locks (create separately or set create_backend_resources)
+# create_backend_resources: false                          # set true only for a bootstrap run
