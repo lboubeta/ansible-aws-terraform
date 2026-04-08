@@ -27,4 +27,4 @@ terraform_workspace: "{{ playbook_dir }}/worktrees/{{ github_repo_name }}"
 git_commit_user_name: "Ansible Automation"
 git_commit_user_email: "ansible@example.com"
 
-plan_repo_url: "https://github.com/{{ github_owner }}/{{ github_repo_name }}.git"
+plan_repo_url: "https://github.com/{{ github_owner }}/{{ project_name }}.git"

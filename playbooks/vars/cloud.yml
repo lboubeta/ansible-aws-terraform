@@ -34,3 +34,5 @@ backend_region: "eu-west-1"                          # region of the bucket (def
 # backend_encrypt: true                                  # enable SSE
 # backend_dynamodb_table: "test-tf-locks"               # optional: DynamoDB table name for locks (create separately or set create_backend_resources)
 # create_backend_resources: false                          # set true only for a bootstrap run
+
+plan_repo_url: "https://github.com/{{ github_owner }}/{{ project_name }}.git" # URL of the repository to store the plan
