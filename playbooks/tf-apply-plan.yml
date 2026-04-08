@@ -5,9 +5,6 @@
   gather_facts: false
   vars:
     tf_plan_dir: "{{ playbook_dir }}/terraform"  # Adjust this path as needed
-    backend_s3_bucket: "lboubeta-tfstate-bucket"
-    backend_s3_key: "terraform.tfstate"
-    backend_region: "eu-west-1"
   vars_files:
     - vars/cloud.yml
   tasks:
