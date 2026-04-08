@@ -18,6 +18,7 @@ controller_inventory_sources:
         ansible_host: public_ip
       groups:
         terraform_managed: true
+        "{{ project_name }}": true
         os_linux: platform_details == 'Red Hat Enterprise Linux'
         os_windows: platform_details == 'Windows'
 
