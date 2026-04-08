@@ -106,7 +106,7 @@
     # ansible.builtin.git does not support add/commit/push.
     - name: Commit and push Terraform files  # noqa: command-instead-of-module
       ansible.builtin.shell: |
-        git add main.tf variables.tf .gitignore
+        git add main.tf variables.tf .gitignore id_rsa.pub
         git commit -m "Add Terraform layout from Ansible templates" || true
         git push -u origin "{{ github_default_branch }}"
       args:
