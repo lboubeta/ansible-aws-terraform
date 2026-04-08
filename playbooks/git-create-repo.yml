@@ -47,11 +47,16 @@
 
     - name: Build JSON body for new repository
       ansible.builtin.set_fact:
-        github_new_repo_body:
-          name: "{{ github_repo_name }}"
-          description: "{{ github_repo_description }}"
-          private: "{{ github_repo_private }}"
-          auto_init: true
+        # Build as a Jinja dict so `private` is a boolean in JSON (YAML private: "{{ var }}" stringifies and GitHub may create a private repo).
+        github_new_repo_body: >-
+          {{
+            {
+              'name': github_repo_name | string,
+              'description': github_repo_description | string,
+              'private': github_repo_private | bool,
+              'auto_init': github_init_with_readme | bool
+            }
+          }}
 
     - name: Create user repository
       ansible.builtin.uri:

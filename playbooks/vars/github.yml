@@ -10,8 +10,11 @@ github_web_host: "github.com"
 github_owner: "your-github-user-or-org"
 github_repo_name: "my-terraform-repo"
 github_repo_description: "Terraform generated from Ansible templates"
+# false = public repository; true = private (must serialize as JSON boolean — see git-create-repo.yml body)
 github_repo_private: false
 github_default_branch: "main"
+# Initial README commit (GitHub API auto_init)
+github_init_with_readme: true
 
 # true  -> POST /orgs/{github_owner}/repos
 # false -> POST /user/repos (repo is created for the authenticated user; github_owner should match that user for clone URLs)
