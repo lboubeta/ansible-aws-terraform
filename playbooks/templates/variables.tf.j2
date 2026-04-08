@@ -85,13 +85,13 @@ variable "key_name" {
 variable "public_key_path" {
   description = "Local path to public key file (used by aws_key_pair)"
   type        = string
-  default     = "{{ public_key_path | default('../../.ssh/aws_test_id_rsa.pub') }}"
+  default     = "{{ public_key_path | default('../../../.ssh/aws_test_id_rsa.pub') }}"
 }
 
 variable "private_key_path" {
   description = "Local path to private key file (used in ssh command output)"
   type        = string
-  default     = "{{ private_key_path | default('../../.ssh/aws_test_id_rsa') }}"
+  default     = "{{ private_key_path | default('../../../.ssh/aws_test_id_rsa') }}"
 }
 
 variable "ssh_user" {
