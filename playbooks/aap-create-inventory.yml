@@ -1,0 +1,13 @@
+---
+- name: Setup Terraform inventory based on tfstate file
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/cloud.yml
+  tasks:
+    - name: Include configuration for inventory source
+      ansible.builtin.include_vars: "vars/inventory-source.yml"
+
+    - name: Demo Components
+      ansible.builtin.include_role:
+        name: infra.aap_configuration.controller_inventory_sources

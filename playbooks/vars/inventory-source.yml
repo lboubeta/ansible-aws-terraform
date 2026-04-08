@@ -1,0 +1,34 @@
+---
+
+controller_inventory_sources:
+  - name: "{{ project_name }} Infrastructure"
+    organization: Tech Days
+    description: Inventory source for {{ project_name }} hosts
+    inventory: Tech Days Inventory
+    source_type: Terraform State
+    credential: "{{ project_name }} Inventory Source Credential"
+    overwrite: true
+    variables: |
+      plugin: cloud.terraform.terraform_state
+      backend_type: s3
+      hostnames:
+        - tag:Name
+      compose:
+        ansible_host: public_ip
+      groups:
+        terraform_managed: true
+        os_linux: platform_details == 'Red Hat Enterprise Linux'
+        os_windows: platform_details == 'Windows'
+
+controller_credentials:
+  - name: "{{ project_name }} Inventory Source Credential"
+    description: Credential for {{ project_name }} inventory source
+    organization: Tech Days
+    credential_type: Terraform backend configuration
+    inputs:
+      configuration: |
+        bucket = "{{ backend_s3_bucket }}"
+        key = "{{ backend_s3_key }}"
+        region = "{{ backend_region }}"
+        access_key = "{{ lookup('ansible.builtin.env', 'AWS_ACCESS_KEY_ID') }}"
+        secret_key = "{{ lookup('ansible.builtin.env', 'AWS_SECRET_ACCESS_KEY') }}"
