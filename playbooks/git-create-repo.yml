@@ -1,0 +1,126 @@
+---
+# Create an empty GitHub repository via the REST API (if it does not already exist).
+# Requires: PAT with repo scope (for org repos, token must be allowed to create repos there).
+#
+# Usage:
+#   export GITHUB_TOKEN=ghp_xxx
+#   ansible-playbook create-github-repo.yml
+#
+- name: Create GitHub repository
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/github.yml
+  vars:
+    github_token: "{{ github_token | default(lookup('ansible.builtin.env', 'GITHUB_TOKEN', default='')) }}"
+  tasks:
+
+    - name: Require GitHub token
+      ansible.builtin.assert:
+        that:
+          - github_token | length > 0
+        fail_msg: >-
+          Set github_token (e.g. -e github_token=...) or export GITHUB_TOKEN.
+
+    - name: Require owner and repository name
+      ansible.builtin.assert:
+        that:
+          - github_owner | length > 0
+          - github_repo_name | length > 0
+          - github_owner != 'your-github-user-or-org'
+        fail_msg: >-
+          Edit vars/github.yml (or use -e) to set github_owner and github_repo_name.
+
+    - name: Check if repository already exists
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/repos/{{ github_owner }}/{{ github_repo_name }}"
+        method: GET
+        headers:
+          Accept: application/vnd.github+json
+          Authorization: "Bearer {{ github_token }}"
+          X-GitHub-Api-Version: "2022-11-28"
+        status_code: [200, 404]
+      register: github_repo_lookup
+      no_log: true
+
+    - name: Build JSON body for new repository
+      ansible.builtin.set_fact:
+        github_new_repo_body:
+          name: "{{ github_repo_name }}"
+          description: "{{ github_repo_description }}"
+          private: "{{ github_repo_private }}"
+          auto_init: false
+
+    - name: Create user repository
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/user/repos"
+        method: POST
+        body_format: json
+        body: "{{ github_new_repo_body }}"
+        headers:
+          Accept: application/vnd.github+json
+          Authorization: "Bearer {{ github_token }}"
+          X-GitHub-Api-Version: "2022-11-28"
+        status_code: [201]
+      register: github_repo_create_user
+      when: not github_is_org | bool and github_repo_lookup.status == 404
+      no_log: true
+
+    - name: Create organization repository
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/orgs/{{ github_owner }}/repos"
+        method: POST
+        body_format: json
+        body: "{{ github_new_repo_body }}"
+        headers:
+          Accept: application/vnd.github+json
+          Authorization: "Bearer {{ github_token }}"
+          X-GitHub-Api-Version: "2022-11-28"
+        status_code: [201]
+      register: github_repo_create_org
+      when: github_is_org | bool and github_repo_lookup.status == 404
+      no_log: true
+
+    - name: Record clone URL from existing repository
+      ansible.builtin.set_fact:
+        github_effective_clone_url: "{{ github_repo_lookup.json.clone_url }}"
+      when: github_repo_lookup.status == 200
+
+    - name: Record clone URL from new user repository
+      ansible.builtin.set_fact:
+        github_effective_clone_url: "{{ github_repo_create_user.json.clone_url }}"
+      when:
+        - github_repo_lookup.status == 404
+        - github_repo_create_user is defined
+        - not (github_repo_create_user.skipped | default(false))
+
+    - name: Record clone URL from new organization repository
+      ansible.builtin.set_fact:
+        github_effective_clone_url: "{{ github_repo_create_org.json.clone_url }}"
+      when:
+        - github_repo_lookup.status == 404
+        - github_repo_create_org is defined
+        - not (github_repo_create_org.skipped | default(false))
+
+    - name: Ensure clone URL is known
+      ansible.builtin.assert:
+        that:
+          - github_effective_clone_url is defined
+          - github_effective_clone_url | length > 0
+        fail_msg: Could not determine clone URL from GitHub API response.
+
+    - name: Show repository result
+      ansible.builtin.debug:
+        msg:
+          outcome: "{{ 'already_exists' if github_repo_lookup.status == 200 else 'created' }}"
+          clone_url: "{{ github_effective_clone_url }}"
+          html_url: >-
+            {{
+              github_repo_lookup.json.html_url
+              if github_repo_lookup.status == 200
+              else (
+                github_repo_create_user.json.html_url
+                | default(github_repo_create_org.json.html_url | default(''))
+              )
+            }}
