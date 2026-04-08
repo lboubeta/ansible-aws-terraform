@@ -1,0 +1,116 @@
+---
+# Clone (or update) the GitHub repo, render main.tf / variables.tf from templates, commit, and push.
+# Run after create-github-repo.yml using the same vars/github.yml and token.
+#
+# Usage:
+#   export GITHUB_TOKEN=ghp_xxx
+#   ansible-playbook sync-terraform-repo.yml
+#
+- name: Sync Terraform content to GitHub repository
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/github.yml
+    - vars/cloud.yml
+  vars:
+    github_token: "{{ github_token | default(lookup('ansible.builtin.env', 'GITHUB_TOKEN', default='')) }}"
+    # PAT in URL is required for non-interactive HTTPS push to private repos; task uses no_log.
+    git_authenticated_url: "https://x-access-token:{{ github_token }}@{{ github_web_host }}/{{ github_owner }}/{{ github_repo_name }}.git"
+    # main.tf.j2 (AWS) expects type for AMI selection
+    type: "linux"
+    terraform_reset_workspace: false
+  tasks:
+
+    - name: Require GitHub token
+      ansible.builtin.assert:
+        that:
+          - github_token | length > 0
+        fail_msg: >-
+          Set github_token or export GITHUB_TOKEN.
+
+    - name: Require owner and repository name
+      ansible.builtin.assert:
+        that:
+          - github_owner != 'your-github-user-or-org'
+          - github_repo_name | length > 0
+        fail_msg: >-
+          Edit vars/github.yml to set github_owner and github_repo_name.
+
+    - name: Remove local workspace when reset requested
+      ansible.builtin.file:
+        path: "{{ terraform_workspace }}"
+        state: absent
+      when: terraform_reset_workspace | bool
+
+    - name: Ensure workspace parent directory exists
+      ansible.builtin.file:
+        path: "{{ terraform_workspace | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Clone or update repository
+      ansible.builtin.git:
+        repo: "{{ git_authenticated_url }}"
+        dest: "{{ terraform_workspace }}"
+        version: "{{ github_default_branch }}"
+        force: true
+      no_log: true
+
+    - name: Generate main.tf from template
+      ansible.builtin.template:
+        src: templates/main.tf.j2
+        dest: "{{ terraform_workspace }}/main.tf"
+        mode: "0644"
+
+    - name: Generate variables.tf from template
+      ansible.builtin.template:
+        src: templates/variables.tf.j2
+        dest: "{{ terraform_workspace }}/variables.tf"
+        mode: "0644"
+
+    - name: Install Terraform .gitignore
+      ansible.builtin.copy:
+        dest: "{{ terraform_workspace }}/.gitignore"
+        mode: "0644"
+        content: |
+          .terraform/
+          .terraform.lock.hcl
+          *.tfstate
+          *.tfstate.*
+          crash.log
+          override.tf
+          *.tfvars
+          !*.tfvars.example
+
+    - name: Set local git author for this repository  # noqa: no-changed-when
+      community.general.git_config:
+        scope: local
+        repo: "{{ terraform_workspace }}"
+        name: user.name
+        value: "{{ git_commit_user_name }}"
+
+    - name: Set local git email for this repository  # noqa: no-changed-when
+      community.general.git_config:
+        scope: local
+        repo: "{{ terraform_workspace }}"
+        name: user.email
+        value: "{{ git_commit_user_email }}"
+
+    # ansible.builtin.git does not support add/commit/push.
+    - name: Commit and push Terraform files  # noqa: command-instead-of-module
+      ansible.builtin.shell: |
+        git add main.tf variables.tf .gitignore
+        git commit -m "Add Terraform layout from Ansible templates" || true
+        git push -u origin "{{ github_default_branch }}"
+      args:
+        chdir: "{{ terraform_workspace }}"
+      register: git_push
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+      failed_when: git_push.rc != 0
+      changed_when: "'nothing to commit' not in git_push.stdout"
+
+    - name: Show push result
+      ansible.builtin.debug:
+        msg: "{{ git_push.stdout_lines | default([]) + git_push.stderr_lines | default([]) }}"
