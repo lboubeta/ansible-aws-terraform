@@ -87,7 +87,7 @@
       ansible.builtin.copy:
         dest: "{{ terraform_workspace }}/id_rsa.pub"
         mode: "0644"
-        content: "{{ lookup('file', '.ssh/aws_test_id_rsa.pub') }}"
+        content: "{{ lookup('file', '.ssh/id_rsa.pub') }}"
 
     - name: Set local git author for this repository  # noqa: no-changed-when
       community.general.git_config:
