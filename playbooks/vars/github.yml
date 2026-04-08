@@ -8,7 +8,7 @@ github_web_host: "github.com"
 
 # Repository namespace: GitHub username or organization name
 github_owner: "your-github-user-or-org"
-github_repo_name: "my-terraform-repo"
+github_repo_name: "{{ project_name }}"
 github_repo_description: "Terraform generated from Ansible templates"
 # false = public repository; true = private (must serialize as JSON boolean — see git-create-repo.yml body)
 github_repo_private: false
@@ -26,3 +26,5 @@ terraform_workspace: "{{ playbook_dir }}/worktrees/{{ github_repo_name }}"
 # Git identity for commits from automation (override in Vault / extra vars if needed)
 git_commit_user_name: "Ansible Automation"
 git_commit_user_email: "ansible@example.com"
+
+plan_repo_url: "https://github.com/{{ github_owner }}/{{ github_repo_name }}.git"
