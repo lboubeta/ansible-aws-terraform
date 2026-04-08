@@ -8,7 +8,7 @@ controller_inventory_sources:
     source_type: Terraform State
     credential: "{{ project_name }} Inventory Source Credential"
     overwrite: true
-    variables: |
+    source_vars:
       plugin: cloud.terraform.terraform_state
       backend_type: s3
       hostnames:
