@@ -1,13 +1,13 @@
 variable "name_prefix" {
   description = "Prefix used for naming resources"
   type        = string
-  default     = "{{ name_prefix | default('logista') }}"
+  default     = "{{ name_prefix | default('techday') }}"
 }
 
 variable "vm_name" {
   description = "Name for the vm based on project and type"
   type        = string
-  default     = "{{ type | default('linux') }}_{{ name_prefix | default('logista') }}"
+  default     = "{{ name_prefix }}_{{ type | default('linux') }}_{{ project_name | default('perfect-app') }}"
 }
 
 variable "aws_region" {
