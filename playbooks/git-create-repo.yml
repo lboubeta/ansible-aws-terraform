@@ -1,5 +1,6 @@
 ---
-# Create an empty GitHub repository via the REST API (if it does not already exist).
+# Create a GitHub repository via the REST API (if it does not already exist).
+# By default the repo is initialized with an initial README (GitHub auto_init).
 # Requires: PAT with repo scope (for org repos, token must be allowed to create repos there).
 #
 # Usage:
@@ -50,7 +51,7 @@
           name: "{{ github_repo_name }}"
           description: "{{ github_repo_description }}"
           private: "{{ github_repo_private }}"
-          auto_init: false
+          auto_init: true
 
     - name: Create user repository
       ansible.builtin.uri:
