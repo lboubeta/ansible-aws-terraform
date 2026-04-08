@@ -18,9 +18,11 @@ controller_inventory_sources:
         ansible_host: public_ip
       groups:
         terraform_managed: true
-        "{{ project_name }}": true
         os_linux: platform_details == 'Red Hat Enterprise Linux'
         os_windows: platform_details == 'Windows'
+      keyed_groups:
+        - key: tags.Project
+          prefix: tf
 
 controller_credentials:
   - name: "{{ project_name }} Inventory Source Credential"

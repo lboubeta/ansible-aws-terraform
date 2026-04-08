@@ -1,4 +1,14 @@
 # Projects, Inventories, Inventory Sources, Labels, Credentials, Execution Environments, Job Templates, Workflow Job Templates
+#
+# Load order: include vars/cloud.yml before this file (or alongside it) so backend_* S3 variables exist.
+#
+# Terraform backend credential: S3 settings use backend_* from vars/cloud.yml. For access_key/secret_key,
+# Ansible cannot read decrypted values from another AAP credential via API; attach your Amazon Web Services
+# credential to the Job Template that applies this file so Controller injects AWS_ACCESS_KEY_ID and
+# AWS_SECRET_ACCESS_KEY — the lookups below read those at apply time. Set the name here for reference only.
+
+
+aap_terraform_aws_source_credential_name: "My AWS credential"
 
 rh_certified_token: "<your_published_token_here>" # Replace with your actual Red Hat Certified token
 
@@ -24,9 +34,9 @@ controller_roles:
 ### PROJECT ###
 
 controller_projects:
-  - name: Logista AAP PoC
-    organization: Logista
-    description: Project for managing Logista controller configurations
+  - name: Tech Days AAP PoC
+    organization: Tech Days
+    description: Project for managing Tech Days controller configurations
     scm_branch: main
     scm_clean: 'no'
     scm_update_on_launch: 'no'
@@ -36,15 +46,15 @@ controller_projects:
 ### INVENTORY ###
 
 controller_inventories:
-  - name: Logista Inventory
-    organization: Logista
-    description: Inventory for Logista hosts
+  - name: Tech Days Inventory
+    organization: Tech Days
+    description: Inventory for Tech Days hosts
 
 ### HOSTS ###
 
 controller_hosts:
   - name: localhost
-    inventory: Logista Inventory
+    inventory: Tech Days Inventory
     description: Localhost for testing purposes
     enabled: true
     variables:
@@ -53,19 +63,19 @@ controller_hosts:
 ### LABELS ###
 
 controller_labels:
-  - name: vmware
-    organization: Logista
+  - name: aws
+    organization: Tech Days
   - name: linux
-    organization: Logista
+    organization: Tech Days
   - name: windows
-    organization: Logista
+    organization: Tech Days
 
 ### CREDENTIALS ###
 
 controller_credentials:
   - name: Linux Credential
     description: Credential for Linux hosts
-    organization: CaC
+    organization: Tech Days
     credential_type: Machine
     inputs:
       username: root
@@ -73,7 +83,7 @@ controller_credentials:
   - name: "Red Hat Published"
     description: "Red Hat Published Galaxy Credential"
     credential_type: "Ansible Galaxy/Automation Hub API Token"
-    organization: CaC
+    organization: Tech Days
     inputs:
       url: https://console.redhat.com/api/automation-hub/content/published/
       auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
@@ -81,24 +91,35 @@ controller_credentials:
   - name: "Red Hat Verified"
     description: "Red Hat Verified Galaxy Credential"
     credential_type: "Ansible Galaxy/Automation Hub API Token"
-    organization: CaC
+    organization: Tech Days
     inputs:
       url: https://console.redhat.com/api/automation-hub/content/verified/
       auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
       token: "{{ rh_certified_token }}"
   - name: "GitHub PAT"
     description: "GitHub Personal Access Token"
-    organization: CaC
+    organization: Tech Days
     credential_type: "GitHub Personal Access Token"
     inputs:
       token: <your_github_pat_here> # Replace with your actual GitHub PAT
+  - name: Terraform Backend - S3 state
+    description: S3 backend for Terraform remote state (cloud.terraform / Terraform state inventory)
+    organization: Tech Days
+    credential_type: "Terraform backend configuration"
+    inputs:
+      configuration: |
+        bucket = "{{ backend_s3_bucket }}"
+        key = "{{ backend_s3_key }}"
+        region = "{{ backend_region }}"
+        access_key = "{{ lookup('ansible.builtin.env', 'AWS_ACCESS_KEY_ID') }}"
+        secret_key = "{{ lookup('ansible.builtin.env', 'AWS_SECRET_ACCESS_KEY') }}"
 
 
 ### EXECUTION ENVIRONMENT ###
 
 controller_execution_environments:
-  - name: CaC EE
-    # organization: CaC
+  - name: Tech Days EE
+    # organization: Tech Days
     image: <your_ee_image_here> # Replace with your actual EE image
 
 
@@ -113,12 +134,12 @@ controller_templates:
     project: Summit25 CICD Project
     playbook: ansible/init-git-repo.yml
     credential: Linux Credential
-    organization: CaC
+    organization: Tech Days
     allow_simultaneous: true
     notification_templates_success:
       - Slack Summit
     labels:
-      - CaC
+      - Tech Days
     survey_enabled: true
     survey_spec:
       name: New Project Name
