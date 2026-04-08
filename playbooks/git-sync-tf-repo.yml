@@ -83,6 +83,12 @@
           *.tfvars
           !*.tfvars.example
 
+    - name: Add ssh public key to the repository
+      ansible.builtin.copy:
+        dest: "{{ terraform_workspace }}/id_rsa.pub"
+        mode: "0644"
+        content: "{{ lookup('file', '.ssh/aws_test_id_rsa.pub') }}"
+
     - name: Set local git author for this repository  # noqa: no-changed-when
       community.general.git_config:
         scope: local
