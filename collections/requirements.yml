@@ -4,3 +4,4 @@ collections:
   - name: containers.podman
   - name: community.general
   - name: amazon.aws
+  - name: infra.aap_configuration
