@@ -1,163 +1,518 @@
-# Projects, Inventories, Inventory Sources, Labels, Credentials, Execution Environments, Job Templates, Workflow Job Templates
+---
+# Controller objects for infra.aap_configuration — consolidated from
+# aap-export/export/Tech Days (and ORGANIZATIONLESS Tech Days Machine + APD AAP Credential pattern).
 #
-# Load order: include vars/cloud.yml before this file (or alongside it) so backend_* S3 variables exist.
-#
-# Terraform backend credential: S3 settings use backend_* from vars/cloud.yml. For access_key/secret_key,
-# Ansible cannot read decrypted values from another AAP credential via API; attach your Amazon Web Services
-# credential to the Job Template that applies this file so Controller injects AWS_ACCESS_KEY_ID and
-# AWS_SECRET_ACCESS_KEY — the lookups below read those at apply time. Set the name here for reference only.
+# Load vars/cloud.yml (or similar) before this file if you use Terraform/S3 backend lookups.
+# Set aap_hostname to your platform URL (same value as gateway.yml) for AAP Credential.host.
+# Omit or replace workflow until job templates exist; the exported WF referenced Demo Job Template.
 
-
-aap_terraform_aws_source_credential_name: "My AWS credential"
-
-rh_certified_token: "<your_published_token_here>" # Replace with your actual Red Hat Certified token
-
-slack_token: "<your_slack_token_here>" # Replace with your actual Slack token
-
-### ROLES ###
-
+### Roles (teams must exist via gateway.yml aap_teams) ###
 controller_roles:
-  - role: member
-    users:
-      - "infra"
-    target_team: "Operators"
-  - role: member
-    users:
-      - "bob"
-    target_team: "Developers"
   - role: admin
     users:
-      - "admin"
-      - "infra"
-    target_team: "Admins"
+      - admin
+      - techdays_infra
+    target_team: Admins
+  - role: member
+    users:
+      - techdays_infra
+    target_team: Operators
 
-### PROJECT ###
-
+### Projects ###
 controller_projects:
-  - name: Tech Days AAP PoC
+  - name: AWS Terraform
     organization: Tech Days
-    description: Project for managing Tech Days controller configurations
-    scm_branch: main
-    scm_clean: 'no'
-    scm_update_on_launch: 'no'
+    description: AWS + Terraform + Git automation (ansible-aws-terraform)
     scm_type: git
-    scm_url: <your_git_repo_here> # Replace with your actual Git repository URL
+    scm_url: https://github.com/lboubeta/ansible-aws-terraform.git
+    scm_branch: main
+    scm_clean: false
+    scm_delete_on_update: false
+    scm_update_on_launch: false
+    allow_override: false
+  - name: Terraform Example
+    organization: Tech Days
+    description: Example Terraform layout (terraform-example)
+    scm_type: git
+    scm_url: https://github.com/lboubeta/terraform-example.git
+    scm_branch: main
+    scm_clean: false
+    scm_delete_on_update: false
+    scm_update_on_launch: false
+    allow_override: false
 
-### INVENTORY ###
-
+### Inventories ###
 controller_inventories:
   - name: Tech Days Inventory
     organization: Tech Days
-    description: Inventory for Tech Days hosts
+    description: Dynamic inventory for Tech Days (EC2 + Terraform state)
 
-### HOSTS ###
-
+### Hosts ###
 controller_hosts:
   - name: localhost
     inventory: Tech Days Inventory
-    description: Localhost for testing purposes
+    description: Localhost for local-connection jobs
     enabled: true
     variables:
       ansible_connection: local
 
-### LABELS ###
+### Inventory sources ###
+controller_inventory_sources:
+  - name: AWS Instances
+    description: EC2 dynamic inventory
+    organization: Tech Days
+    source: ec2
+    inventory: Tech Days Inventory
+    credential: AWS Tech Days
+    update_on_launch: false
+    overwrite: false
 
+### Labels ###
 controller_labels:
   - name: aws
     organization: Tech Days
-  - name: linux
-    organization: Tech Days
-  - name: windows
+  - name: techdays
     organization: Tech Days
 
-### CREDENTIALS ###
-
+### Credentials (no secrets in git — use vault / CI) ###
 controller_credentials:
-  - name: Linux Credential
-    description: Credential for Linux hosts
+  - name: AWS Tech Days
+    description: AWS API keys for Tech Days jobs and EC2 inventory
+    credential_type: Amazon Web Services
     organization: Tech Days
+    inputs:
+      username: "{{ vault_aws_techdays_access_key }}"
+      password: "{{ vault_aws_techdays_secret_key }}"
+  - name: Tech Days Machine
+    description: SSH key for Linux | Setup Initial Config on EC2 instances
     credential_type: Machine
-    inputs:
-      username: root
-      password: "admin123!" # This is just an example, use vault or other secure methods in production
-  - name: "Red Hat Published"
-    description: "Red Hat Published Galaxy Credential"
-    credential_type: "Ansible Galaxy/Automation Hub API Token"
     organization: Tech Days
     inputs:
-      url: https://console.redhat.com/api/automation-hub/content/published/
-      auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
-      token: "{{ rh_certified_token }}"
-  - name: "Red Hat Verified"
-    description: "Red Hat Verified Galaxy Credential"
-    credential_type: "Ansible Galaxy/Automation Hub API Token"
-    organization: Tech Days
-    inputs:
-      url: https://console.redhat.com/api/automation-hub/content/verified/
-      auth_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
-      token: "{{ rh_certified_token }}"
-  - name: "GitHub PAT"
-    description: "GitHub Personal Access Token"
-    organization: Tech Days
-    credential_type: "GitHub Personal Access Token"
-    inputs:
-      token: <your_github_pat_here> # Replace with your actual GitHub PAT
+      username: "{{ vault_techdays_machine_username | default('ec2-user') }}"
+      ssh_key_data: "{{ vault_techdays_machine_ssh_key_data }}"
   - name: Terraform Backend - S3 state
-    description: S3 backend for Terraform remote state (cloud.terraform / Terraform state inventory)
+    description: S3 remote state for Terraform (optional; job templates may use env from AWS credential)
     organization: Tech Days
-    credential_type: "Terraform backend configuration"
+    credential_type: Terraform backend configuration
     inputs:
       configuration: |
         bucket = "{{ backend_s3_bucket }}"
         key = "{{ backend_s3_key }}"
         region = "{{ backend_region }}"
-        access_key = "{{ lookup('ansible.builtin.env', 'AWS_ACCESS_KEY_ID') }}"
-        secret_key = "{{ lookup('ansible.builtin.env', 'AWS_SECRET_ACCESS_KEY') }}"
+        access_key = "{{ lookup('ansible.builtin.env', 'AWS_ACCESS_KEY_ID', default='') }}"
+        secret_key = "{{ lookup('ansible.builtin.env', 'AWS_SECRET_ACCESS_KEY', default='') }}"
 
-
-### EXECUTION ENVIRONMENT ###
-
+### Execution environments (images must exist on your cluster / registry) ###
 controller_execution_environments:
-  - name: Tech Days EE
-    # organization: Tech Days
-    image: <your_ee_image_here> # Replace with your actual EE image
+  - name: Terraform EE
+    image: "{{ vault_ee_terraform_image | default('quay.io/ansible/ansible-runner:latest') }}"
 
-
-### JOB TEMPLATES ###
-
+### Job templates (inventory unified on Tech Days Inventory; export had Demo Inventory) ###
 controller_templates:
-  ### 1. Job Template ###
-  - name: "[DEV] Create Git Project"
-    description: Job template to create Git project
-    job_type: run
-    inventory: Default Summit Connect Inventory
-    project: Summit25 CICD Project
-    playbook: ansible/init-git-repo.yml
-    credential: Linux Credential
+  - name: AWS | Create S3 Bucket
     organization: Tech Days
-    allow_simultaneous: true
-    notification_templates_success:
-      - Slack Summit
+    project: AWS Terraform
+    inventory: Tech Days Inventory
+    playbook: playbooks/create-s3-bucket.yml
+    job_type: run
+    credentials:
+      - AWS Tech Days
     labels:
-      - Tech Days
+      - aws
+      - techdays
+    use_fact_cache: true
     survey_enabled: true
     survey_spec:
-      name: New Project Name
-      description: Name of the new AAP project to create
+      name: ""
+      description: ""
       spec:
-        - question_name: New Project Name
-          question_description: Enter the name for the new AAP project
+        - variable: bucket_name
+          question_name: Bucket Name
+          type: text
           required: true
-          type: text
-          max: 50
-          variable: new_repo_name
-          default: "New_AAP_Project"
-          new_question: true
-        - question_name: New Project Description
-          question_description: Enter a description for the new AAP project
+          default: techday-tfstate-bucket
+        - variable: region
+          question_name: Region
+          type: multiplechoice
+          required: true
+          choices:
+            - eu-west-1
+          default: eu-west-1
+
+  - name: AWS | Deploy VMs
+    organization: Tech Days
+    project: AWS Terraform
+    inventory: Tech Days Inventory
+    playbook: playbooks/deploy-cloud-vms.yml
+    job_type: run
+    labels:
+      - aws
+      - techdays
+
+  - name: TF | Apply Plan
+    organization: Tech Days
+    project: AWS Terraform
+    inventory: Tech Days Inventory
+    playbook: playbooks/tf-apply-plan.yml
+    job_type: run
+    credentials:
+      - AWS Tech Days
+    execution_environment: Terraform EE
+    labels:
+      - techdays
+    use_fact_cache: true
+    survey_enabled: true
+    survey_spec:
+      name: ""
+      description: ""
+      spec:
+        - variable: infrastructure_state
+          question_name: Apply or Destroy?
+          type: multiplechoice
           required: false
+          choices:
+            - present
+            - absent
+          default: present
+        - variable: project_name
+          question_name: Project Name
           type: text
-          max: 100
-          variable: new_repo_description
-          default: "Repository for new AAP project"
+          required: true
+          default: awesome-app
+        - variable: github_owner
+          question_name: Owner
+          type: text
+          required: true
+          default: lboubeta
+
+  - name: GIT | Create Repo
+    organization: Tech Days
+    project: AWS Terraform
+    inventory: Tech Days Inventory
+    playbook: playbooks/git-create-repo.yml
+    job_type: run
+    labels:
+      - techdays
+    use_fact_cache: true
+    survey_enabled: true
+    survey_spec:
+      name: ""
+      description: ""
+      spec:
+        - variable: github_owner
+          question_name: Owner
+          type: text
+          required: true
+          default: lboubeta
+        - variable: github_token
+          question_name: Personal Access Token
+          type: password
+          required: true
+        - variable: github_repo_description
+          question_name: Repo Description
+          type: text
+          required: false
+        - variable: github_repo_private
+          question_name: Private repo?
+          type: multiplechoice
+          required: true
+          choices:
+            - "true"
+            - "false"
+          default: "false"
+        - variable: github_default_branch
+          question_name: Default Branch
+          type: text
+          required: true
+          default: main
+
+  - name: GIT | Create TF Plan & Push
+    organization: Tech Days
+    project: AWS Terraform
+    inventory: Tech Days Inventory
+    playbook: playbooks/git-sync-tf-repo.yml
+    job_type: run
+    execution_environment: Product Demos EE
+    labels:
+      - techdays
+    use_fact_cache: true
+    survey_enabled: true
+    survey_spec:
+      name: ""
+      description: ""
+      spec:
+        - variable: project_name
+          question_name: Project Name
+          type: text
+          required: true
+          default: perfect-app
+        - variable: github_owner
+          question_name: Owner
+          type: text
+          required: true
+          default: lboubeta
+        - variable: github_token
+          question_name: Personal Access Token
+          type: password
+          required: true
+        - variable: github_repo_description
+          question_name: Repo Description
+          type: text
+          required: false
+        - variable: github_default_branch
+          question_name: Default Branch
+          type: text
+          required: true
+          default: main
+        - variable: name_prefix
+          question_name: Name Prefix
+          type: text
+          required: true
+          default: techdays
+        - variable: type
+          question_name: Type
+          type: multiplechoice
+          required: true
+          choices:
+            - linux
+            - windows
+          default: linux
+        - variable: aws_region
+          question_name: Region
+          type: multiplechoice
+          required: true
+          choices:
+            - eu-west-1
+            - eu-west-2
+            - us-east-1
+            - us-east-2
+            - eu-north-1
+          default: eu-west-1
+        - variable: vm_count
+          question_name: Number of VMs
+          type: integer
+          required: true
+          default: 1
+        - variable: instance_type
+          question_name: Instance Type
+          type: multiplechoice
+          required: true
+          choices:
+            - t3.micro
+            - t3.small
+            - t3.medium
+            - t3.large
+            - t3.xlarge
+          default: t3.medium
+
+  - name: TF | Create Project Inventory Source
+    organization: Tech Days
+    project: AWS Terraform
+    inventory: Tech Days Inventory
+    playbook: playbooks/aap-create-inventory.yml
+    job_type: run
+    credentials:
+      - AAP Credential
+      - AWS Tech Days
+    execution_environment: Product Demos EE
+    labels:
+      - techdays
+    survey_enabled: true
+    survey_spec:
+      name: ""
+      description: ""
+      spec:
+        - variable: project_name
+          question_name: Project Name
+          type: text
+          required: true
+          default: perfect-app
+    extra_vars:
+      project_name: perfect-app
+
+  - name: Linux | Setup Initial Config
+    organization: Tech Days
+    project: AWS Terraform
+    inventory: Tech Days Inventory
+    playbook: playbooks/day_0.yml
+    job_type: run
+    credentials:
+      - Tech Days Machine
+    execution_environment: Default execution environment
+    labels:
+      - techdays
+    become_enabled: true
+
+# Workflow uses stable string identifiers (infra.aap_configuration simplified_workflow_nodes).
+# success_nodes / failure_nodes reference those identifiers only — not controller-generated UUIDs.
+
+controller_workflows:
+  - name: WF | Deploy Terraform Infrastructure in AWS
+    description: Sync project, approval, S3 + Git paths converging to TF plan/apply, inventory, Linux day-0
+    organization: Tech Days
+    # Set true once if this workflow already exists with an old UUID-based node layout and CaC fails to reconcile.
+    destroy_current_nodes: false
+    allow_simultaneous: false
+    ask_variables_on_launch: false
+    ask_inventory_on_launch: false
+    ask_limit_on_launch: false
+    scm_branch: ""
+    limit: ""
+    webhook_service: ""
+    extra_vars: ""
+    labels:
+      - techdays
+    survey_enabled: true
+    survey_spec:
+      name: ""
+      description: ""
+      spec:
+        - variable: github_owner
+          question_name: Github Repo Owner
+          type: text
+          required: true
+          default: lboubeta
+          min: 0
+          max: 1024
           new_question: true
+        - variable: github_token
+          question_name: Github Personal Access Token
+          type: password
+          required: true
+          min: 1
+          max: 1024
+          new_question: true
+        - variable: project_name
+          question_name: Project Name
+          type: text
+          required: true
+          default: awesome-app
+          min: 0
+          max: 1024
+          new_question: true
+        - variable: type
+          question_name: OS Type
+          type: multiplechoice
+          required: true
+          choices:
+            - linux
+            - windows
+          default: linux
+          min: 0
+          max: 1024
+          new_question: false
+        - variable: aws_region
+          question_name: AWS Region
+          type: multiplechoice
+          required: true
+          choices:
+            - eu-west-1
+            - eu-west-2
+          default: eu-west-1
+          min: 0
+          max: 1024
+          new_question: true
+        - variable: vm_count
+          question_name: Number of VMs
+          type: integer
+          required: true
+          default: 1
+          min: 1
+          max: 4
+          new_question: true
+        - variable: instance_type
+          question_name: Instance Type
+          type: multiplechoice
+          required: true
+          choices:
+            - t3.micro
+            - t3.small
+            - t3.medium
+            - t3.large
+          default: t3.medium
+          min: 0
+          max: 1024
+          new_question: true
+    simplified_workflow_nodes:
+      - identifier: wf_sync_aws_terraform
+        organization: Tech Days
+        unified_job_template: AWS Terraform
+        all_parents_must_converge: false
+        success_nodes:
+          - wf_approval_cost
+
+      - identifier: wf_approval_cost
+        organization: Tech Days
+        approval_node:
+          name: Cost Estimation Approval
+          description: ""
+          timeout: 0
+        all_parents_must_converge: false
+        success_nodes:
+          - wf_create_s3_bucket
+          - wf_git_create_repo
+
+      - identifier: wf_create_s3_bucket
+        organization: Tech Days
+        unified_job_template: AWS | Create S3 Bucket
+        all_parents_must_converge: false
+        extra_data:
+          bucket_name: lboubeta-tfstate-bucket
+          region: eu-west-1
+        success_nodes:
+          - wf_git_tf_plan_push
+
+      - identifier: wf_git_create_repo
+        organization: Tech Days
+        unified_job_template: GIT | Create Repo
+        all_parents_must_converge: false
+        extra_data:
+          github_owner: lboubeta
+          github_repo_private: "false"
+          github_default_branch: main
+          github_repo_name: techday-test
+        success_nodes:
+          - wf_git_tf_plan_push
+
+      - identifier: wf_git_tf_plan_push
+        organization: Tech Days
+        unified_job_template: GIT | Create TF Plan & Push
+        all_parents_must_converge: true
+        extra_data:
+          github_owner: lboubeta
+          github_repo_name: techday-test
+          github_default_branch: main
+          name_prefix: techdays
+          type: linux
+          aws_region: eu-west-1
+          vm_count: "1"
+          instance_type: t3.medium
+        success_nodes:
+          - wf_tf_apply_plan
+
+      - identifier: wf_tf_apply_plan
+        organization: Tech Days
+        unified_job_template: TF | Apply Plan
+        all_parents_must_converge: false
+        extra_data:
+          plan_repo_url: https://github.com/lboubeta/techday-test
+          infrastructure_state: present
+          backend_s3_bucket: wintest-tfstate-bucket
+          backend_region: eu-west-1
+          backend_s3_key: terraform.tfstate
+        success_nodes:
+          - wf_create_inventory_source
+
+      - identifier: wf_create_inventory_source
+        organization: Tech Days
+        unified_job_template: TF | Create Project Inventory Source
+        all_parents_must_converge: false
+        success_nodes:
+          - wf_linux_setup_initial
+
+      - identifier: wf_linux_setup_initial
+        organization: Tech Days
+        unified_job_template: Linux | Setup Initial Config
+        limit: awesome-app
+        all_parents_must_converge: false
+        success_nodes: []
