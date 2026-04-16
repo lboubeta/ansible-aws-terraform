@@ -149,7 +149,7 @@ resource "aws_instance" "{{ type }}_{{ name_prefix }}" {
   subnet_id                  = aws_subnet.{{ name_prefix }}_public_subnet.id
   vpc_security_group_ids     = [aws_security_group.{{ name_prefix }}_sg.id]
   associate_public_ip_address = true
-  key_name                   = aws_key_pair.{{ name_prefix }}_key.key_name
+  key_name                   = aws_key_pair.{{ project_name }}_key.key_name
 
   tags = merge({ Name = format("%s_%02d", var.vm_name, count.index), Deployment = "terraform", Family = "{{ type }}", Project = "{{ project_name }}" }, var.tags)
 
