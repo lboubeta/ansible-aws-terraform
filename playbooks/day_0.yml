@@ -1,10 +1,10 @@
 ---
 
 - name: Prepare OS with minimum requirements
-  hosts: all
+  hosts: "{{ project_group }}"
   vars_files:
     - vars/main.yml
-    # - vars/cloud.yml
+    - vars/cloud.yml
   tasks:
     - name: Install list of packages
       ansible.builtin.package:
