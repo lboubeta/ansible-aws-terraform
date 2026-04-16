@@ -13,7 +13,7 @@ variable "vm_name" {
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "{{ aws_region | default('eu-west-1') }}"
+  default     = "{{ region | default('eu-west-1') }}"
 }
 
 variable "aws_az_suffix" {
