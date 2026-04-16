@@ -1,11 +1,11 @@
 # Variables used by playbooks/templates/main.tf.j2 and the terraform role.
 # Put secret values into Ansible Vault or your CI secret store.
 
-cloud: "aws"                     # "aws" | "gcp" | "azure"
-name_prefix: "techday"           # used for resource names
-region: "eu-west-1"              # AWS/Azure region or GCP region base
+cloud: "{{ cloud | default('aws') }}"                     # "aws" | "gcp" | "azure"
+name_prefix: "{{ name_prefix | default('techday') }}"           # used for resource names
+region: "{{ region | default('eu-west-1') }}"              # AWS/Azure region or GCP region base
 create_public_ip: true            # whether to create public IPs for VMs
-project_name: "perfect-app"           # used for resource names
+project_name: "{{ project_name }}"           # used for resource names
 
 # Networking
 cidr_block: "10.0.0.0/16"
@@ -13,7 +13,7 @@ subnet_cidr: "10.0.1.0/24"
 
 # VM specifics
 vm_count: 1
-instance_type: "t3.micro"        # AWS / GCP / Azure sizes as appropriate
+instance_type: "{{ instance_type | default('t3.micro') }}"        # AWS / GCP / Azure sizes as appropriate
 
 # image: used for AWS (AMI id) and GCP (image family or project/image); Azure uses azure_image map
 #     Windows ami: "ami-0f4dbc4289c547d4d"
